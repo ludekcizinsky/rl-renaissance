@@ -1,5 +1,5 @@
 defaults:
-  - model: stateless_ppo
+  - method: stateless_ppo
   - _self_
 
 paths:
@@ -24,3 +24,11 @@ reward:
   n_consider: 10 
   # eigenvalue partition between valid and invalid models
   eig_partition: -2.5
+
+
+# Just to let Hydra know where to save the config file
+hydra:
+  run:
+    dir: ${paths.output_dir}/${now:%Y-%m-%d}_${now:%H-%M-%S}
+  job:
+    chdir: False
