@@ -9,20 +9,21 @@ Generation of kinetic models using RL.
 First, pull the image from the Docker registry using apptainer (takes a couple of minutes):
 
 ```bash
-mkdir -p /scratch/$USER/cizinsky/images
+mkdir -p /scratch/izar/$USER/images
 apptainer pull /scratch/izar/$USER/images/renaissance_with_ml.sif docker://ludekcizinsky/renaissance_with_ml:latest
 ```
 
 Then, you can run the image with the following command:
 
 ```bash
-apptainer shell --bind "$(pwd)":/home/renaissance/work /scratch/izar/$USER/images/renaissance_with_ml.sif
+mkdir -p /scratch/izar/$USER/rl-for-kinetics/output
+apptainer shell --bind "$(pwd)":/home/renaissance/work -bind /scratch/izar/$USER/rl-for-kinetics/output:/home/renaissance/output /scratch/izar/$USER/images/renaissance_with_ml.sif
 ```
 
 If things go well, you should be able to execute the following command to check if the image is working:
 
 ```bash
-python -c "import skimpy;print('Success')"
+python -c "import skimpy; import torch;print('Success')"
 ```
 
 ### Local
@@ -42,7 +43,7 @@ docker run --rm -it -v "$(pwd)":/home/renaissance/work renaissance_with_ml:lates
 If things go well, you should be able to execute the following command to check if the image is working:
 
 ```bash
-python -c "import skimpy;print('Success')"
+python -c "import skimpy; import torch;print('Success')"
 ```
 
 ## Running the code

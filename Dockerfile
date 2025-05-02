@@ -71,7 +71,7 @@ COPY docker/.bashrc $HOME/.bashrc
 RUN chown $USER:$USER $HOME/.bashrc
 
 # 13. Copy in your Renaissance project (at repo root)
-COPY . /home/renaissance/renaissance
+COPY ./renaissance /home/renaissance/renaissance 
 
 # 14. Bake in your package (Cython extensions + [ORACLE] extras)
 RUN pip install /home/renaissance/renaissance[ORACLE]
