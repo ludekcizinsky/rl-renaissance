@@ -2,41 +2,48 @@
 Generation of kinetic models using RL.
 
 
-## Installation
+## Setting up docker container
+
+You should be able to run the code using the provided Docker image. The image is based on the `ludekcizinsky/renaissance_with_ml` image, which is a modified version of the original Renaissance image with ML libraries added.
 
 ### Izar
 
-This guide assumes you have access to the Izar compute cluster. First, clone this repository in your home directory. Then, pull the skimpy docker image:
+
+### Local
+
+Assuming you have Docker desktop installed, you can run the following commands to pull the image locally:
 
 ```bash
-mkdir -p /scratch/izar/$USER/images
-apptainer pull /scratch/izar/$USER/images/skimpy.sif docker://danielweilandt/skimpy
+docker pull ludekcizinsky/renaissance_with_ml:latest
 ```
 
-Next, install skimpy:
+Then, you can run the image with the following command:
 
 ```bash
-module load git-lfs
-git clone git@github.com:EPFL-LCSB/skimpy.git /home/$USER/skimpy
-git -C /home/$USER//skimpy lfs pull
+docker run --rm -it -v "$(pwd)":/home/renaissance/work renaissance_with_ml:latest
 ```
 
-Next, get inside the container, mount the code and data directory, and install the requirements:
+If things go well, you should be able to execute the following command to check if the image is working:
 
 ```bash
-mkdir -p /scratch/izar/$USER/rl-for-kinetics/data
-apptainer shell \
-  --bind /scratch/izar/$USER/rl-for-kinetics/data:/mnt/data \
-  --bind /home/$USER/skimpy:/mnt/skimpy \
-  --bind /home/$USER/rl-gen-of-kinetic-models:/mnt/code \
-  /scratch/izar/$USER/images/skimpy.sif
+python -c "import skimpy; import torch;print('Success')"
 ```
 
+## Running the code
 
-
-
-Then, inside the Apptainer container, run the following commands to install the requirements:
+Once you have the Docker container running, you can run the orirignal baseline code as follows:
 
 ```bash
-pip install -r /mnt/code/requirements.txt
+cd renaissance
+python 1-renaissance.py
 ```
+
+However, since loading the data takes around one minute, you can execute the code in a Jupyter notebook instead or using ipython:
+
+```bash
+cd renaissance
+ipython
+run 1-renaissance.py
+```
+
+todo: once we have the renaissance code running, we can add info on how to run the RL code.
