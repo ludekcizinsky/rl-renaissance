@@ -8,10 +8,28 @@ You should be able to run the code using the provided Docker image. The image is
 
 ### Izar
 
+First, pull the image from the Docker registry using apptainer (takes a couple of minutes):
+
+```bash
+mkdir -p /scratch/$USER/cizinsky/images
+apptainer pull /scratch/izar/$USER/images/renaissance_with_ml.sif docker://ludekcizinsky/renaissance_with_ml:latest
+```
+
+Then, you can run the image with the following command:
+
+```bash
+apptainer shell --bind "$(pwd)":/home/renaissance/work /scratch/izar/$USER/images/renaissance_with_ml.sif
+```
+
+If things go well, you should be able to execute the following command to check if the image is working:
+
+```bash
+python -c "import skimpy;print('Success')"
+```
 
 ### Local
 
-Assuming you have Docker desktop installed, you can run the following commands to pull the image locally:
+Assuming you have Docker desktop installed, you can run the following commands to pull the image locally (takes a couple of minutes):
 
 ```bash
 docker pull ludekcizinsky/renaissance_with_ml:latest
@@ -26,7 +44,7 @@ docker run --rm -it -v "$(pwd)":/home/renaissance/work renaissance_with_ml:lates
 If things go well, you should be able to execute the following command to check if the image is working:
 
 ```bash
-python -c "import skimpy; import torch;print('Success')"
+python -c "import skimpy;print('Success')"
 ```
 
 ## Running the code
