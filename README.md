@@ -4,8 +4,6 @@ Generation of kinetic models using RL.
 
 ## Setting up docker container
 
-You should be able to run the code using the provided Docker image. The image is based on the `ludekcizinsky/renaissance_with_ml` image, which is a modified version of the original Renaissance image with ML libraries added.
-
 ### Izar
 
 First, pull the image from the Docker registry using apptainer (takes a couple of minutes):
