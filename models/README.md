@@ -1,0 +1,1 @@
+All of our organism‐specific computational models and related artifacts live in this directory. Each subfolder here captures one complete model, including its kinetics, thermodynamics, steady‐state data, and parameter lists.
