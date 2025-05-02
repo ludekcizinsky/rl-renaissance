@@ -4,7 +4,7 @@ defaults:
 
 paths:
   met_model_path: varma_ecoli_shikki # Metabolic model being analyzed. All data are loaded accordingly from the folder '/Models' in supplementary data
-  output_dir: /scratch/izar/cizinsky/rl-for-kinetics/output
+  output_dir: /home/renaissance/output 
 
 
 constraints:
