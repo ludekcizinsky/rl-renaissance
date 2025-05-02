@@ -28,3 +28,25 @@ escher==1.7.0
 # Additional things that are useful in RabLab
 #python-libsbml
 xlrd
+
+
+# ---- ML packages
+# PyTorch 
+torch
+
+# Hydra and OmegaConf for configuration
+hydra-core
+omegaconf
+
+# Logging
+wandb
+tensorboard
+
+# Metrics
+torchmetrics
+
+# Progress bars
+tqdm
+
+# Jupyter Notebook support
+jupyter
