@@ -34,10 +34,11 @@ Assuming you have Docker desktop installed, you can run the following commands t
 docker pull ludekcizinsky/renaissance_with_ml:latest
 ```
 
-Then, you can run the image with the following command:
+Then, start the docker container using the below command (make sure to change the path `path_to_local_output` accordingly):
 
 ```bash
-docker run --rm -it -v "$(pwd)":/home/renaissance/work renaissance_with_ml:latest
+path_to_local_output="/path/to/your/local/output/folder"
+docker run --rm -it -v "$(pwd)":/home/renaissance/work -v "${path_to_local_output}:/home/renaissance/output" renaissance_with_ml:latest
 ```
 
 If things go well, you should be able to execute the following command to check if the image is working:
