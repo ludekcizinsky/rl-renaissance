@@ -1,10 +1,10 @@
 defaults:
-  - model: stateless_ppo
+  - method: stateless_ppo
   - _self_
 
 paths:
   met_model_path: varma_ecoli_shikki # Metabolic model being analyzed. All data are loaded accordingly from the folder '/Models' in supplementary data
-  output_dir: /scratch/izar/cizinsky/rl-for-kinetics/output
+  output_dir: /home/renaissance/output 
 
 
 constraints:
@@ -24,3 +24,11 @@ reward:
   n_consider: 10 
   # eigenvalue partition between valid and invalid models
   eig_partition: -2.5
+
+
+# Just to let Hydra know where to save the config file
+hydra:
+  run:
+    dir: ${paths.output_dir}/${now:%Y-%m-%d}_${now:%H-%M-%S}
+  job:
+    chdir: False

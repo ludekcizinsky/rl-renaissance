@@ -1,7 +1,7 @@
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
-from helpers.jacobian_solver import check_jacobian
+from renaissance.kinetics.jacobian_solver import check_jacobian
 
 
 @hydra.main(config_path="configs", config_name="train.yaml", version_base="1.1")
