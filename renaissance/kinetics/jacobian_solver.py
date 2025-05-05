@@ -162,7 +162,7 @@ class check_jacobian():
     def _load_ssprofile(self, met_model,exp_id,ss_idx):
 
         path_to_samples = f'models/{met_model}/steady_state_samples/samples_{exp_id}.csv'
-        self.samples = pd.read_csv(path_to_samples, header=0, index_col=0).iloc[ss_idx, 0:]
+        self.samples = pd.read_csv(path_to_samples, header=0, index_col=0).iloc[ss_idx-1, 0:]
 
         flux_series = load_fluxes(self.samples, self.tmodel, self.kmodel,
                                  density=self.DENSITY,
