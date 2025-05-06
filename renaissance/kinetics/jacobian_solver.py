@@ -193,5 +193,6 @@ class check_jacobian():
 
     def _prepare_parameters(self, parameters, parameter_names):
 
+        parameters = np.exp(parameters)
         self.parameter_set = pd.DataFrame(parameters, columns = parameter_names)
 
