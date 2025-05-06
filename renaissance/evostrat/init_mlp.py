@@ -17,7 +17,6 @@ configs.read('configfile.ini')
 class MLP():
     def __init__(self, cond_class, min_x, max_x, n_samples, NAMES_km=None, param_fixing=False):
         self.latent_dim = int(configs['MLP']['latent_dim'])
-        print(self.latent_dim)
         self.cond_class = cond_class
         self.min_x = min_x
         self.max_x = max_x

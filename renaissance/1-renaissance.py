@@ -31,11 +31,11 @@ def reward_func(weights):
         max_eig = chk_jcbn.calc_eigenvalues_recal_vmax()
         return max_eig
 
+    pool = mp.Pool(n_threads)
     mlp.generator.set_weights(weights)
     gen_params = mlp.sample_parameters()
     gen_params = [[params] for params in gen_params]
-
-    max_eig = [calc_eig(params) for params in gen_params]
+    max_eig = pool.map(calc_eig, gen_params)
     max_eig = np.array([this_eig for eig in max_eig for this_eig in eig])
 
     if reward_flag == 0:
@@ -48,6 +48,9 @@ def reward_func(weights):
         max_eig.sort()
         considered_avg = sum(max_eig[:n_consider]) / n_consider
         this_reward = np.exp(-0.1 * considered_avg) / 2
+    
+    pool.close()
+    pool.join()
 
     return this_reward
 
@@ -105,7 +108,8 @@ for rep in range(repeats):
                            sigma= noise,  # noise std deviation
                            learning_rate=lr,
                            decay=decay,
-                           num_threads=1)
+                           num_threads=1,#TODO: change to n_threads when we resolve the multiprocessing issue
+                           n_samples=n_samples) 
 
     rewards = es.run(generations, print_step=save_step)
     hp.save_pkl(f'{this_savepath}/rewards', rewards)
