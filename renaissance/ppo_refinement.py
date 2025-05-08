@@ -221,21 +221,10 @@ class PPORefinement:
         max_eig_list = self.chk_jcbn.calc_eigenvalues_recal_vmax()
         return max_eig_list[0] # Assuming it returns the scalar max eigenvalue
 
-    def _compute_reward(self, lambda_max_val, current_step_in_episode, is_final_param_set_pT):
-        # current_step_in_episode is 1-indexed (1 to T)
-        # lambda_max_val is for the parameter set p_current_step_in_episode
-        
-        intermediate_r = 1.0 / (1.0 + np.exp(self.k_reward_steepness * (lambda_max_val - (-2.5))))
+    def _compute_reward(self, lambda_max_val):
+        intermediate_r = 1.0 / (1.0 + np.exp(self.k_reward_steepness * (lambda_max_val - (self.eig_partition_final_reward))))
+        # TODO: Right now, we are not using the Incidence part of the reward.
 
-        if is_final_param_set_pT: # This is p_T, reward is r_{T-1} but includes final term
-            # Simplified incidence: 1 if lambda_max(p_T) is good, scaled penalty otherwise.
-            # This is a proxy for "incidence(p_T)"
-            if lambda_max_val <= self.eig_partition_final_reward:
-                incidence_proxy_reward = 1.0 
-            else:
-                # Penalty similar to original reward_func, but for a single sample
-                incidence_proxy_reward = 0.01 / (1 + np.exp(lambda_max_val - self.eig_partition_final_reward))
-            return intermediate_r + incidence_proxy_reward
         return intermediate_r
 
     def _collect_trajectories(self):
@@ -291,9 +280,7 @@ class PPORefinement:
                 lambda_max_p_next_val = self._get_lambda_max(p_next_tensor)
                 
                 is_final_param_set = (t_step == self.T_horizon - 1) # p_next_tensor is p_T
-                reward_val = self._compute_reward(lambda_max_p_next_val,
-                                                  current_step_in_episode=t_step + 1,
-                                                  is_final_param_set_pT=is_final_param_set)
+                reward_val = self._compute_reward(lambda_max_p_next_val)
                 
                 batch_rewards.append(torch.tensor([reward_val], dtype=torch.float32))
                 episode_total_reward += reward_val
