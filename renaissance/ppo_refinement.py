@@ -121,7 +121,8 @@ class PPORefinement:
             # Episode initialization
             # Generate p0: small random values, then clamp. No parameter fixing.
             p_curr_np = np.random.normal(0, self.p0_init_std, size=self.param_dim)
-            p_curr_np = np.clip(p_curr_np, self.min_x_bounds, self.max_x_bounds)
+            p_curr_np = (p_curr_np - p_curr_np.min()) / (p_curr_np.max() - p_curr_np.min())  # Normalize to [0, 1]
+            p_curr_np = p_curr_np * (self.max_x_bounds - self.min_x_bounds) + self.min_x_bounds  # Scale to [min_x_bounds, max_x_bounds]
             
             # Generate z for state
             z_curr_np = np.random.normal(0, 1, size=self.latent_dim)
