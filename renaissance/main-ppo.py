@@ -5,6 +5,7 @@ import multiprocessing as mp
 from configparser import ConfigParser
 import torch
 from ppo_refinement import PPORefinement
+from ppo_refinement import evaluate_policy_incidence
 
 from kinetics.jacobian_solver import check_jacobian
 
@@ -69,3 +70,12 @@ for rep in range(repeats):
     
     hp.save_pkl(f'{this_savepath}/ppo_iteration_rewards.pkl', ppo_iteration_rewards)
     print(f"Repeat {rep}: PPO training finished. Rewards log saved to {this_savepath}")
+    
+    best_actor_path = os.path.join(this_savepath, "best_actor.pth")
+    print(f"Repeat {rep}: Evaluating policy incidence using {best_actor_path}...")
+    incidence_rate, all_final_params = evaluate_policy_incidence(ppo_agent, best_actor_path, num_trials=50)
+    print(f"Repeat {rep}: Incidence Rate: {incidence_rate:.4f}")
+    hp.save_pkl(f'{this_savepath}/policy_incidence_results.pkl', {
+        "incidence_rate": incidence_rate,
+        "all_final_params": all_final_params
+    })

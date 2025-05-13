@@ -56,7 +56,7 @@ class PPORefinement:
                  actor_hidden_dims=(256, 512, 1024), critic_hidden_dims=(256, 512, 1024),
                  p0_init_std=1, actor_lr=1e-4, critic_lr=1e-4, 
                  gamma=0.99, epsilon=0.2, gae_lambda=0.95,
-                 ppo_epochs=10, num_episodes_per_update=64, 
+                 ppo_epochs=10, num_episodes_per_update=32, 
                  T_horizon=5, k_reward_steepness=1.0,
                  action_clip_range=(-0.1, 0.1),
                  entropy_coeff=0.01, max_grad_norm=0.5):
@@ -259,6 +259,10 @@ class PPORefinement:
         os.makedirs(output_path_base, exist_ok=True)
         
         all_iter_avg_rewards = []
+        best_avg_reward = float('-inf')  # Initialize to negative infinity
+        best_actor_path = os.path.join(output_path_base, "best_actor.pth")
+        best_critic_path = os.path.join(output_path_base, "best_critic.pth")
+        
         print(f"Starting PPO training for {num_iterations} iterations (serial execution).") 
         print(f"State dim: {self.state_dim}, Action dim: {self.action_dim}, Latent (z) dim: {self.latent_dim}")
         print(f"Num episodes per update: {self.num_episodes_per_update}, Horizon T: {self.T_horizon}")
@@ -280,6 +284,13 @@ class PPORefinement:
             print(f"Iter {iteration:04d}: Avg Ep Reward: {avg_episode_reward:.4f}, "
                     f"Actor Loss: {actor_loss:.4f}, Critic Loss: {critic_loss:.4f}")
             
+             # Save the best model if the current average reward is the highest
+            if avg_episode_reward > best_avg_reward:
+                best_avg_reward = avg_episode_reward
+                torch.save(self.actor.state_dict(), best_actor_path)
+                torch.save(self.critic.state_dict(), best_critic_path)
+                print(f"Iter {iteration:04d}: New best model saved with Avg Ep Reward: {best_avg_reward:.4f}")
+
             if iteration % 50 == 0 or iteration == num_iterations -1 : 
                 actor_path = os.path.join(output_path_base, f"actor_iter_{iteration}.pth")
                 critic_path = os.path.join(output_path_base, f"critic_iter_{iteration}.pth")
@@ -288,3 +299,69 @@ class PPORefinement:
         
         print("Training finished.")
         return all_iter_avg_rewards
+
+def evaluate_policy_incidence(ppo_instance, actor_path, num_trials=1):
+    """
+    Evaluate the policy incidence using a pre-trained actor model.
+
+    Args:
+        ppo_instance: The PPORefinement instance.
+        actor_path: Path to the pre-trained actor model (best_actor.pth).
+        num_trials: Number of trials to evaluate the policy incidence.
+
+    Returns:
+        incidence_rate: The rate of valid models.
+        all_final_params: List of final parameters for valid models.
+    """
+    # Load the pre-trained actor model
+    ppo_instance.actor.load_state_dict(torch.load(actor_path))
+    ppo_instance.actor.eval()  # Set to evaluation mode
+
+    valid_count = 0
+    all_final_params = []
+
+    for i in range(num_trials):
+        with torch.no_grad():
+            # Sample initial p0
+            p0_np = np.random.normal(0, ppo_instance.p0_init_std, size=ppo_instance.param_dim)
+            p0_np = (p0_np - p0_np.min()) / (p0_np.max() - p0_np.min())  # Normalize
+            p0_np = p0_np * (ppo_instance.max_x_bounds - ppo_instance.min_x_bounds) + ppo_instance.min_x_bounds
+            p_curr = torch.tensor(p0_np, dtype=torch.float32)
+
+            # Sample latent z
+            z = torch.tensor(np.random.normal(0, 1, size=ppo_instance.latent_dim), dtype=torch.float32)
+
+            for t_s in range(ppo_instance.T_horizon):
+                lambda_max_val = ppo_instance._get_lambda_max(p_curr)
+
+                state_torch = torch.cat((
+                    p_curr,
+                    z,
+                    torch.tensor([lambda_max_val], dtype=torch.float32),
+                    torch.tensor([t_s], dtype=torch.float32)
+                )).unsqueeze(0)
+
+                action_mean, action_std = ppo_instance.actor(state_torch)
+                dist = Normal(action_mean, action_std)
+                action = dist.sample()
+                action_clipped = torch.clamp(action.squeeze(0), ppo_instance.action_clip_range[0], ppo_instance.action_clip_range[1])
+                p_next = p_curr + action_clipped
+                p_next = torch.clamp(p_next, ppo_instance.min_x_bounds, ppo_instance.max_x_bounds)
+                p_curr = p_next
+
+            # Final p_curr after T steps
+            p_final_np = p_curr.detach().cpu().numpy()
+            ppo_instance.chk_jcbn._prepare_parameters([p_final_np], ppo_instance.names_km_full)
+
+            # max eigenvalue check
+            max_eig_list = ppo_instance.chk_jcbn.calc_eigenvalues_recal_vmax()
+            max_eig_val = max_eig_list[0]
+            is_valid = max_eig_val <= ppo_instance.eig_partition_final_reward
+
+            if is_valid:
+                valid_count += 1
+                all_final_params.append(p_final_np)
+
+    incidence_rate = valid_count / num_trials
+    print(f"Incidence Rate (valid models): {incidence_rate:.4f} ({valid_count}/{num_trials})")
+    return incidence_rate, all_final_params
