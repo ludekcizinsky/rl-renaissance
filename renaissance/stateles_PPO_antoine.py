@@ -6,6 +6,7 @@ from configparser import ConfigParser
 
 from evostrat.init_mlp import MLP
 from evostrat.evolution_strategy import EvolutionStrategy
+from evostrat.RL_statelessMDP_PPO import PPOAgent
 
 from kinetics.jacobian_solver import check_jacobian
 
@@ -101,16 +102,34 @@ for rep in range(repeats):
 
     this_savepath = f'{output_path}/repeat_{rep}/'
     os.makedirs(this_savepath, exist_ok=True)
+#####################################################################################################################################
+    # dummy input size = 1 (stateless), hidden size arbitrary, output = parameter vector dim
+    ppo = PPOAgent(
+        input_dim=1,
+        hidden_dim=64,
+        output_dim= 500,
+        reward_func=reward_func,
+        save_path=this_savepath,
+        n_samples=10, #n_samples,
+        lr=3e-4,
+        clip_eps=0.2,
+        epochs=10,
+        batch_size=64
+    )
 
-    es = EvolutionStrategy(mlp.generator.get_weights(),
-                           reward_func, this_savepath,
-                           population_size= pop_size,
-                           sigma= noise,  # noise std deviation
-                           learning_rate=lr,
-                           decay=decay,
-                           num_threads=1,#TODO: change to n_threads when we resolve the multiprocessing issue
-                           n_samples=n_samples) 
+    rewards = ppo.run(generations)
 
-    rewards = es.run(generations, print_step=save_step)
-    hp.save_pkl(f'{this_savepath}/rewards', rewards)
+################################################################################################################################
+    # es = EvolutionStrategy(mlp.generator.get_weights(),
+    #                        reward_func, this_savepath,
+    #                        population_size= pop_size,
+    #                        sigma= noise,  # noise std deviation
+    #                        learning_rate=lr,
+    #                        decay=decay,
+    #                        num_threads=1,#TODO: change to n_threads when we resolve the multiprocessing issue
+    #                        n_samples=n_samples) 
+
+    # rewards = es.run(generations, print_step=save_step)
+    # hp.save_pkl(f'{this_savepath}/rewards', rewards)
+#################################################################################################################################
 

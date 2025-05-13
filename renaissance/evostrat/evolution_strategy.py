@@ -13,7 +13,7 @@ def worker_process(arg):
 
 class EvolutionStrategy(object):
     def __init__(self, weights, get_reward_func, savepath, population_size=50, sigma=0.1,
-                 learning_rate=0.03, decay=0.999, num_threads=1):
+                 learning_rate=0.03, decay=0.999, num_threads=1, n_samples=100):
 
         self.weights = weights
         self.get_reward = get_reward_func
@@ -23,6 +23,7 @@ class EvolutionStrategy(object):
         self.learning_rate = learning_rate
         self.decay = decay
         self.num_threads = mp.cpu_count() if num_threads == -1 else num_threads
+        self.n_samples = n_samples
 
     def _get_weights_try(self, w, p):
         weights_try = []
@@ -70,7 +71,7 @@ class EvolutionStrategy(object):
 
     def run(self, iterations, print_step=1):
         pool = mp.Pool(self.num_threads) if self.num_threads > 1 else None
-        print('starting')
+        print('starting evolution strategy')
         start = time.time()
         all_rewards = []
 
@@ -78,21 +79,25 @@ class EvolutionStrategy(object):
 
             population = self._get_population()
 
+            print(f'[{iteration}] getting rewards for the population ({len(population)*self.n_samples} reward calculations in total)')
             rewards = self._get_rewards(pool, population)
 
+            print(f'[{iteration}] updating weights')
             self._update_weights(rewards, population)
 
+            print(f'[{iteration}] getting reward for the updated weights ({self.n_samples} reward calculations in total)')
             this_reward = self.get_reward(self.weights)
 
+            print(f'[{iteration}] saving weights')
             #save weights
             with open(f'{self.save_path}/weights_{iteration}.pkl', 'wb') as f:
                     pickle.dump(self.weights, f)
 
             if (iteration + 1) % print_step == 0:
-                print('********iter %d. reward: %f********' % (iteration + 1, this_reward ))
+                this_end = time.time()
+                print(f'[{iteration}] reward: {this_reward:.3f}, time elapsed: {(this_end-start)/60:.2f} minutes')
+
             all_rewards.append(this_reward)
-            this_end = time.time()
-            print(f'Time elapsed: {round((this_end-start)/60, 3)} minutes')
         if pool is not None:
             pool.close()
             pool.join()
