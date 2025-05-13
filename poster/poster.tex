@@ -12,24 +12,24 @@
 \usepackage{graphicx}
 \usepackage{anyfontsize}
 \usepackage{amssymb}
-\usepackage[ruled,vlined]{algorithm2e,setspace}
+
+\usepackage{algorithm2e}   % Only include algorithm2e
+\usepackage{setspace}      % Separately include setspace
+
 \usepackage{pifont}
 \input{packages}
 \input{macros}
+
 \DeclareMathOperator*{\argmax}{arg\,max}
 \DeclareMathOperator*{\argmin}{arg\,min}
-% \usepackage{algorithmicx}
-% \usepackage{algorithm}
-% \usepackage{algpseudocode}
+
 \usepackage{xcolor}
-
-% \SetAlgoCaptionLayout{centerline}
-% \setlength{\algomargin}{20em}
-
 \usepackage{etoolbox}
+
+% Ensure spacing for algorithms
 \AtBeginEnvironment{algorithm}{\setstretch{1.1}}
 
-% If you have N columns, choose \sepwidth and \colwidth such that (N+1)*\sepwidth + N*\colwidth = \paperwidth
+% Layout calculations
 \newlength{\sepwidth}
 \newlength{\colwidth}
 \setlength{\sepwidth}{0.025\paperwidth}
@@ -43,9 +43,10 @@
 % Title etc
 % ====================
 
-\title{Title of your RL project}
+\title{RL-Driven Kinetic Modeling}
 
-\author{Student 1, Student 2, Student 3}
+% \author{Milica Vukasinovic, Natasa Jovanovic, Strahinja Nikolic, Antoine Dávid, Mikulas Vanousek, Ludek Cizinsky}
+\author{M. Vukasinovic, N. Jovanovic, S. Nikolic, A. Dávid, M. Vanousek, L. Cizinsky}
 
 
 % use this to include logos on the left and/or right side of the header:
@@ -60,17 +61,59 @@
 \begin{columns}[t]
 \separatorcolumn
 
+% ------ First column
 \begin{column}{\colwidth}
 
-    \begin{block}{Example block}
+    % ==== Context and Motivation
+    \begin{block}{Context and Motivation}
+    Kinetic models are essential for understanding how \textbf{cells} behave dynamically:
     \begin{itemize}
-        \item example text
+        \item How they respond to stress, grow, or adapt to changes?
+        % \item What happens when genes or enzymes are altered (e.g., in synthetic biology or disease)?
+        \item What happens when genes or enzymes are altered (e.g., in synthetic biology or disease)?
     \end{itemize}
-    
+ 
+    \vspace{0.5cm}
+
+    Applications include robustness analysis of metabolic phenotypes or bioreactor simulations (Figure \ref{fig:applications}).
+
+    % todo: we should include examples that we can explaion on a high level
+    \begin{figure}[h]
+        \centering
+        \includegraphics[width=0.5\textwidth]{assets/applications.png}
+        \caption{Showcase of usecases of kinematic models. Figure from \cite{rennaissance}.}
+        \label{fig:applications}
+    \end{figure}
+
+    However, these models require \textbf{thousands} of kinetic parameters, and most of them are \textbf{unknown}, 
+    \textbf{hard} to measure, or \textbf{inconsistent} across studies.
+    \end{block}
+
+    % ==== Previous Work
+    \begin{block}{Previous Work}
+        Traditional methods:
+        \begin{itemize}
+            \item use outdated parameters, rely on brute-force optimization, and assume simplified networks,
+            \item struggle with scalability, data uncertainty, and handling multi-scale constraints.
+        \end{itemize}
+        
+        Although attempts have been made to address these issues, they often require:
+        \begin{itemize}
+            \item \textbf{extensive} computational time \cite{kfit},
+            \item \textbf{ground truth training data} derived from traditional kinetic modeling approaches \cite{ischrunk,miskovic2019uncertainty,gans}.
+        \end{itemize}
+    Finally, newly proposed framework \textbf{RENAISSANCE} \cite{rennaissance} addresses both of these issues,
+    however, it still has the following limitations:
+    \begin{itemize}
+        \item \textbf{unstable convergence} towards finding the optimal kinetic parameters,
+        \item requires \textbf{ per environment re-training}.
+    \end{itemize}
+
     \end{block}
 
 \end{column}
 
+% ------ Second column ------
 \separatorcolumn
 \begin{column}{\colwidth}
 
