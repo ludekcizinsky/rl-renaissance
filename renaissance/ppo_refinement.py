@@ -162,7 +162,7 @@ class PPORefinement:
                 reward_val = self._compute_reward(lambda_max_p_next_val)
 
                 batch_rewards.append(torch.tensor([reward_val], dtype=torch.float32))
-                episode_total_reward += reward_val
+                episode_total_reward += reward_val / self.T_horizon
 
                 next_state_torch_flat = torch.cat((
                     p_next_torch, z_torch_ep,
