@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.distributions import Normal
+import wandb
 
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # PPO Algorithm Components
@@ -59,7 +60,8 @@ class PPORefinement:
                  ppo_epochs=10, num_episodes_per_update=32, 
                  T_horizon=5, k_reward_steepness=1.0,
                  action_clip_range=(-0.1, 0.1),
-                 entropy_coeff=0.01, max_grad_norm=0.5):
+                 entropy_coeff=0.01, max_grad_norm=0.5,
+                 wandb_project="ppo-refinement", wandb_entity=None):
         
         self.param_dim = param_dim
         self.latent_dim = latent_dim # For z in state
@@ -91,6 +93,34 @@ class PPORefinement:
         self.max_grad_norm = max_grad_norm
         
         self.eig_partition_final_reward = -2.5 
+        
+        # Initialize wandb
+        config = {
+            "param_dim": param_dim,
+            "latent_dim": latent_dim,
+            "min_x_bounds": min_x_bounds,
+            "max_x_bounds": max_x_bounds,
+            "p0_init_std": p0_init_std,
+            "actor_hidden_dims": actor_hidden_dims,
+            "critic_hidden_dims": critic_hidden_dims,
+            "actor_lr": actor_lr,
+            "critic_lr": critic_lr,
+            "gamma": gamma,
+            "epsilon": epsilon,
+            "gae_lambda": gae_lambda,
+            "ppo_epochs": ppo_epochs,
+            "num_episodes_per_update": num_episodes_per_update,
+            "T_horizon": T_horizon,
+            "k_reward_steepness": k_reward_steepness,
+            "action_clip_range": action_clip_range,
+            "entropy_coeff": entropy_coeff,
+            "max_grad_norm": max_grad_norm,
+            "eig_partition_final_reward": self.eig_partition_final_reward
+        }
+        wandb.init(project=wandb_project, entity=wandb_entity, config=config)
+        wandb.run.name = f"PPO_pd{param_dim}_ld{latent_dim}_T{T_horizon}"
+        wandb.watch(self.actor, log="all", log_freq=10)
+        wandb.watch(self.critic, log="all", log_freq=10)
 
     def _get_lambda_max(self, p_tensor_single):
         p_numpy = p_tensor_single.detach().cpu().numpy()
@@ -115,6 +145,7 @@ class PPORefinement:
         batch_dones = []
         
         all_episode_total_rewards = []
+        all_lambda_max_values = []
 
         for i_episode in range(self.num_episodes_per_update):
             print(f"Collecting episode data {i_episode + 1}/{self.num_episodes_per_update}...")
@@ -131,10 +162,12 @@ class PPORefinement:
             z_torch_ep = torch.tensor(z_curr_np, dtype=torch.float32)
 
             episode_total_reward = 0
+            episode_lambda_max_values = []
 
             for t_s in range(self.T_horizon):
                 # Use instance methods for lambda_max and reward
                 lambda_max_pt_val = self._get_lambda_max(p_curr_torch) 
+                episode_lambda_max_values.append(lambda_max_pt_val)
                 
                 state_torch_flat = torch.cat((
                     p_curr_torch, z_torch_ep,
@@ -156,10 +189,10 @@ class PPORefinement:
                 p_next_torch = p_curr_torch + action_clipped
                 p_next_torch = torch.clamp(p_next_torch, self.min_x_bounds, self.max_x_bounds)
                 
+                prev_lambda_max = lambda_max_p_next_val if t_s > 0 else lambda_max_pt_val
                 lambda_max_p_next_val = self._get_lambda_max(p_next_torch)
                 is_final_step = (t_s == self.T_horizon - 1)
-                # print(lambda_max_p_next_val) : for DEBUG
-                reward_val = self._compute_reward(lambda_max_p_next_val)
+                reward_val = self._compute_reward(lambda_max_p_next_val, prev_lambda_max)
 
                 batch_rewards.append(torch.tensor([reward_val], dtype=torch.float32))
                 episode_total_reward += reward_val / self.T_horizon
@@ -174,6 +207,23 @@ class PPORefinement:
                 p_curr_torch = p_next_torch
             
             all_episode_total_rewards.append(episode_total_reward)
+            all_lambda_max_values.extend(episode_lambda_max_values)
+            
+            # Log episode-specific metrics
+            wandb.log({
+                "episode_reward": episode_total_reward,
+                "episode_final_lambda_max": lambda_max_p_next_val,
+                "episode_mean_lambda_max": np.mean(episode_lambda_max_values),
+                "iteration": i_episode,
+            })
+
+        # Log batch statistics
+        if all_lambda_max_values:
+            wandb.log({
+                "batch_mean_lambda_max": np.mean(all_lambda_max_values),
+                "batch_min_lambda_max": np.min(all_lambda_max_values),
+                "batch_max_lambda_max": np.max(all_lambda_max_values),
+            })
 
         # Concatenate collected data into batch tensors
         final_batch_states = torch.stack(batch_states) if batch_states else torch.empty(0, self.state_dim)
@@ -221,12 +271,19 @@ class PPORefinement:
 
         actor_total_loss_epoch = 0
         critic_total_loss_epoch = 0
+        entropy_values = []
+        kl_divs = []
 
-        for _ in range(self.ppo_epochs):
+        for epoch in range(self.ppo_epochs):
             current_pi_mean, current_pi_std = self.actor(states)
             dist_new = Normal(current_pi_mean, current_pi_std)
             log_probs_new = dist_new.log_prob(actions).sum(dim=-1, keepdim=True)
             entropy = dist_new.entropy().mean()
+            entropy_values.append(entropy.item())
+
+            # Compute approximate KL divergence
+            kl_div = (log_probs_old - log_probs_new).mean().item()
+            kl_divs.append(kl_div)
 
             ratios = torch.exp(log_probs_new - log_probs_old.detach()) 
             
@@ -251,6 +308,20 @@ class PPORefinement:
         
         avg_actor_loss = actor_total_loss_epoch / self.ppo_epochs
         avg_critic_loss = critic_total_loss_epoch / self.ppo_epochs
+        
+        # Log update metrics
+        wandb.log({
+            "actor_loss": avg_actor_loss,
+            "critic_loss": avg_critic_loss,
+            "policy_entropy": np.mean(entropy_values),
+            "kl_divergence": np.mean(kl_divs),
+            "explained_variance": 1 - (values - returns).var() / returns.var() if returns.nelement() > 1 else 0,
+            "value_mean": values.mean().item(),
+            "returns_mean": returns.mean().item(),
+            "advantages_mean": advantages.mean().item(),
+            "advantages_std": advantages.std().item(),
+        })
+        
         return avg_actor_loss, avg_critic_loss
 
 
@@ -268,6 +339,12 @@ class PPORefinement:
         print(f"Num episodes per update: {self.num_episodes_per_update}, Horizon T: {self.T_horizon}")
         print(f"p0 initialized with N(0, {self.p0_init_std**2}) and clamped to [{self.min_x_bounds}, {self.max_x_bounds}]")
 
+        wandb.log({
+            "training/total_iterations": num_iterations,
+            "training/state_dim": self.state_dim,
+            "training/action_dim": self.action_dim,
+            "training/latent_dim": self.latent_dim,
+        })
 
         for iteration in range(num_iterations):
             trajectories_data = self._collect_trajectories()
@@ -276,6 +353,11 @@ class PPORefinement:
             if trajectories_data[0].nelement() == 0 and self.num_episodes_per_update > 0:
                 print(f"Iter {iteration:04d}: No trajectories collected. Skipping update. Avg Ep Reward: {avg_episode_reward:.4f}")
                 all_iter_avg_rewards.append(avg_episode_reward) 
+                wandb.log({
+                    "iteration": iteration,
+                    "avg_episode_reward": avg_episode_reward,
+                    "no_trajectories": True,
+                })
                 continue 
 
             actor_loss, critic_loss = self.update(trajectories_data)
@@ -284,18 +366,46 @@ class PPORefinement:
             print(f"Iter {iteration:04d}: Avg Ep Reward: {avg_episode_reward:.4f}, "
                     f"Actor Loss: {actor_loss:.4f}, Critic Loss: {critic_loss:.4f}")
             
-             # Save the best model if the current average reward is the highest
+            # Log iteration metrics
+            wandb.log({
+                "iteration": iteration,
+                "avg_episode_reward": avg_episode_reward,
+                "training/learning_progress": avg_episode_reward / (iteration + 1),
+            })
+            
+            # Save the best model if the current average reward is the highest
             if avg_episode_reward > best_avg_reward:
                 best_avg_reward = avg_episode_reward
                 torch.save(self.actor.state_dict(), best_actor_path)
                 torch.save(self.critic.state_dict(), best_critic_path)
                 print(f"Iter {iteration:04d}: New best model saved with Avg Ep Reward: {best_avg_reward:.4f}")
+                
+                # Log best model metrics
+                wandb.log({
+                    "best_avg_reward": best_avg_reward,
+                    "best_model_iteration": iteration,
+                })
+                
+                # Save model to wandb
+                wandb.save(best_actor_path)
+                wandb.save(best_critic_path)
 
-            if iteration % 50 == 0 or iteration == num_iterations -1 : 
+            if iteration % 50 == 0 or iteration == num_iterations - 1: 
                 actor_path = os.path.join(output_path_base, f"actor_iter_{iteration}.pth")
                 critic_path = os.path.join(output_path_base, f"critic_iter_{iteration}.pth")
                 torch.save(self.actor.state_dict(), actor_path)
                 torch.save(self.critic.state_dict(), critic_path)
+                
+                # Save periodic model to wandb
+                wandb.save(actor_path)
+                wandb.save(critic_path)
+        
+        # Log final training results
+        wandb.log({
+            "final_avg_reward": avg_episode_reward,
+            "best_avg_reward_final": best_avg_reward,
+        })
+        wandb.finish()
         
         print("Training finished.")
         return all_iter_avg_rewards
