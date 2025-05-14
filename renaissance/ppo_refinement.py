@@ -4,8 +4,6 @@ import torch.optim as optim
 from torch.distributions import Normal
 import numpy as np
 
-# Assuming Actor and Critic classes are defined elsewhere and are compatible.
-# Placeholder Actor and Critic for the code to be runnable for demonstration
 class Actor(nn.Module):
     def __init__(self, state_dim, action_dim, hidden_dim):
         super(Actor, self).__init__()
