@@ -67,8 +67,8 @@ class PPOAgent:
 
         self.policy_net = PolicyNetwork(cfg)
         self.value_net = ValueNetwork(cfg)
-        self.policy_optimizer = optim.AdamW(self.policy_net.parameters(), lr=cfg.training.actor_lr)
-        self.value_optimizer = optim.AdamW(self.value_net.parameters(), lr=cfg.training.critic_lr)
+        self.policy_optimizer = optim.AdamW(self.policy_net.parameters(), lr=cfg.method.actor_lr)
+        self.value_optimizer = optim.AdamW(self.value_net.parameters(), lr=cfg.method.critic_lr)
 
     def collect_trajectory(self, env: KineticEnv):
         buf = TrajectoryBuffer()

@@ -22,9 +22,8 @@ def train(cfg: DictConfig):
     chk_jcbn = check_jacobian()
 
     # Integrate data
-    chk_jcbn._load_ktmodels(met_model_name, 'fdp1') # Load kinetic and thermodynamic data
-    chk_jcbn._load_ssprofile(met_model_name, 'fdp1', cfg.constraints.ss_idx) # Integrate steady state information
-    quit()
+    chk_jcbn._load_ktmodels(cfg.paths.met_model_name, 'fdp1') # Load kinetic and thermodynamic data
+    chk_jcbn._load_ssprofile(cfg.paths.met_model_name, 'fdp1', cfg.constraints.ss_idx) # Integrate steady state information
 
     # Logger setup
     logger = get_logger(cfg)

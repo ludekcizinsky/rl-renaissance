@@ -14,7 +14,7 @@ class KineticEnv:
         self.device = cfg.device
 
         self._reset_generator = torch.Generator(device=self.device)
-        self._reset_generator.manual_seed(self.reset_seed)
+        self._reset_generator.manual_seed(cfg.seed)
 
         self.state = None
         self.step_count = 0
