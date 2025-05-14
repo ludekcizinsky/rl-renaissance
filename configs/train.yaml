@@ -15,6 +15,7 @@ paths:
   # Metabolic model being analyzed. All data are loaded accordingly from the folder '/Models' in supplementary data
   names_km: models/varma_ecoli_shikki/parameter_names_km_fdp1.pkl
   output_dir: /home/renaissance/output 
+  met_model_name: varma_ecoli_shikki
 
 constraints:
   ## Custom constraints
