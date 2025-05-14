@@ -4,8 +4,8 @@ import helper as hp
 import multiprocessing as mp
 from configparser import ConfigParser
 import torch
-from ppo_refinement import PPORefinement
-from ppo_refinement import evaluate_policy_incidence
+from helpers.ppo_refinement import PPORefinement
+from helpers.ppo_refinement import evaluate_policy_incidence
 
 from kinetics.jacobian_solver import check_jacobian
 
