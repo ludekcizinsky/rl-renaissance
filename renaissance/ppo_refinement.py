@@ -4,364 +4,234 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.distributions import Normal
 
+import os
+import helper as hp
+from configparser import ConfigParser
+
+from kinetics.jacobian_solver import check_jacobian
+
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 # PPO Algorithm Components
 # ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
 class Actor(nn.Module):
-    def __init__(self, state_dim, action_dim, hidden_dims=(256, 512, 1024)):
+    def __init__(self, state_dim, param_dim, hidden_dim=256):
         super(Actor, self).__init__()
-        self.hidden_dims = hidden_dims 
-        layers = []
-        input_d = state_dim
-        for hidden_d in hidden_dims:
-            layers.append(nn.Linear(input_d, hidden_d))
-            layers.append(nn.ReLU())
-            input_d = hidden_d
-        
-        self.network = nn.Sequential(*layers)
-        self.mean_layer = nn.Linear(hidden_dims[-1], action_dim)
-        self.log_std = nn.Parameter(torch.full((action_dim,), -0.5, dtype=torch.float32))
+        self.param_dim = param_dim
+        self.fc1 = nn.Linear(state_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
+        self.fc_mu = nn.Linear(hidden_dim, param_dim)
+        self.fc_log_std = nn.Linear(hidden_dim, param_dim)
 
     def forward(self, state):
-        x = self.network(state)
-        mean = self.mean_layer(x)
-        std = torch.exp(self.log_std)
-        if mean.ndim > 1 and std.ndim == 1 and std.shape[0] == mean.shape[1]:
-             std = std.unsqueeze(0).expand_as(mean)
-        return mean, std
+        x = torch.relu(self.fc1(state))
+        x = torch.relu(self.fc2(x))
+        mu = self.fc_mu(x)
+        log_std = self.fc_log_std(x)
+        # Clamp log_std to avoid extremely small or large std values
+        log_std = torch.clamp(log_std, -20, 2)
+        return mu, log_std
 
 class Critic(nn.Module):
-    def __init__(self, state_dim, hidden_dims=(256, 512, 1024)):
+    def __init__(self, state_dim, hidden_dim=256):
         super(Critic, self).__init__()
-        self.hidden_dims = hidden_dims 
-        layers = []
-        input_d = state_dim
-        for hidden_d in hidden_dims:
-            layers.append(nn.Linear(input_d, hidden_d))
-            layers.append(nn.ReLU())
-            input_d = hidden_d
-        
-        self.network = nn.Sequential(*layers)
-        self.value_layer = nn.Linear(hidden_dims[-1], 1)
+        self.fc1 = nn.Linear(state_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
+        self.fc_value = nn.Linear(hidden_dim, 1)
 
     def forward(self, state):
-        x = self.network(state)
-        value = self.value_layer(x)
+        x = torch.relu(self.fc1(state))
+        x = torch.relu(self.fc2(x))
+        value = self.fc_value(x)
         return value
-
+    
 class PPORefinement:
-    def __init__(self, param_dim, latent_dim, min_x_bounds, max_x_bounds, 
-                 names_km_full, chk_jcbn,
-                 actor_hidden_dims=(256, 512, 1024), critic_hidden_dims=(256, 512, 1024),
-                 p0_init_std=1, actor_lr=1e-4, critic_lr=1e-4, 
-                 gamma=0.99, epsilon=0.2, gae_lambda=0.95,
-                 ppo_epochs=10, num_episodes_per_update=32, 
-                 T_horizon=5, k_reward_steepness=1.0,
-                 action_clip_range=(-0.1, 0.1),
-                 entropy_coeff=0.01, max_grad_norm=0.5):
-        
+    def __init__(self, param_dim, noise_dim, reward_function,
+                 min_x_bounds, max_x_bounds,
+                 hidden_dim_actor=256, hidden_dim_critic=256,
+                 actor_lr=3e-4, critic_lr=1e-3,
+                 gamma=0.99, ppo_epochs=4, epsilon=0.2,
+                 gae_lambda=0.95, T_horizon=20,
+                 device=None):
+
         self.param_dim = param_dim
-        self.latent_dim = latent_dim # For z in state
-        self.min_x_bounds = min_x_bounds
-        self.max_x_bounds = max_x_bounds
-        self.p0_init_std = p0_init_std
+        self.noise_dim = noise_dim
+        self.state_dim = noise_dim + param_dim
+        self.reward_function = reward_function
+        self.max_grad_norm = 0.5
 
-        self.names_km_full = names_km_full 
-        self.chk_jcbn = chk_jcbn # Store the jacobian checker instance
+        if device is None:
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        else:
+            self.device = device
 
-        # State dim: p_t (param_dim) + z (latent_dim) + lambda_max (1) + t (1)
-        self.state_dim = self.param_dim + self.latent_dim + 1 + 1
-        self.action_dim = self.param_dim # Actor outputs updates to p_t
+        self.min_x_bounds = torch.tensor(min_x_bounds, device=self.device, dtype=torch.float32)
+        self.max_x_bounds = torch.tensor(max_x_bounds, device=self.device, dtype=torch.float32)
+        if self.min_x_bounds.shape == (): # scalar
+            self.min_x_bounds = self.min_x_bounds.repeat(param_dim)
+        if self.max_x_bounds.shape == (): # scalar
+            self.max_x_bounds = self.max_x_bounds.repeat(param_dim)
 
-        self.actor = Actor(self.state_dim, self.action_dim, hidden_dims=actor_hidden_dims)
-        self.critic = Critic(self.state_dim, hidden_dims=critic_hidden_dims)
-        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=actor_lr)
-        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=critic_lr)
 
         self.gamma = gamma
         self.epsilon = epsilon
-        self.gae_lambda = gae_lambda
         self.ppo_epochs = ppo_epochs
-        self.num_episodes_per_update = num_episodes_per_update
+        self.gae_lambda = gae_lambda
         self.T_horizon = T_horizon
-        self.k_reward_steepness = k_reward_steepness 
-        self.action_clip_range = action_clip_range 
-        self.entropy_coeff = entropy_coeff
-        self.max_grad_norm = max_grad_norm
-        
-        self.eig_partition_final_reward = -2.5 
 
-    def _get_lambda_max(self, p_tensor_single):
-        p_numpy = p_tensor_single.detach().cpu().numpy()
-        # Use the stored chk_jcbn instance
-        self.chk_jcbn._prepare_parameters([p_numpy], self.names_km_full) 
-        max_eig_list = self.chk_jcbn.calc_eigenvalues_recal_vmax()
+        self.actor = Actor(self.state_dim, param_dim, hidden_dim_actor).to(self.device)
+        self.critic = Critic(self.state_dim, hidden_dim_critic).to(self.device)
+        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=actor_lr)
+        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=critic_lr)
 
-        return max_eig_list[0] 
+        self.mse_loss = nn.MSELoss()
 
-    def _compute_reward(self, lambda_max_val):
-        intermediate_r = 1.0 / (1.0 + np.exp(self.k_reward_steepness * (lambda_max_val - (self.eig_partition_final_reward))))
-        # TODO: Right now, we are not using the Incidence part of the reward.
+    def _transform_to_bounded(self, params_raw):
+        # Clip params_raw to the range [min_x_bounds, max_x_bounds]
+        # return torch.clamp(params_raw, min=self.min_x_bounds, max=self.max_x_bounds)
+        tanh_params = torch.tanh(params_raw)
+        return self.min_x_bounds + (self.max_x_bounds - self.min_x_bounds) * (tanh_params + 1) / 2.0
 
-        return intermediate_r
+    def _initialize_current_params_for_state(self):
+        # Start with parameters uniformly in the range of min_x_bounds and max_x_bounds
+        current_params_in_state = torch.rand(self.param_dim, device=self.device) * (self.max_x_bounds - self.min_x_bounds) + self.min_x_bounds
+        # Or use: torch.randn(self.param_dim, device=self.device) * 0.1 # Small random noise
+        # current_params_in_state = torch.randn(self.param_dim, device=self.device) * 0.1
+        return current_params_in_state
 
-    def _collect_trajectories(self):
-        batch_states = []
-        batch_actions = []
-        batch_log_probs_actions = []
-        batch_rewards = []
-        batch_next_states = []
-        batch_dones = []
-        
-        all_episode_total_rewards = []
+    def collect_rollout_data(self):
+        states, actions_raw, log_probs_raw, rewards, dones, values = [], [], [], [], [], []
 
-        for i_episode in range(self.num_episodes_per_update):
-            print(f"Collecting episode data {i_episode + 1}/{self.num_episodes_per_update}...")
-            # Episode initialization
-            # Generate p0: small random values, then clamp. No parameter fixing.
-            p_curr_np = np.random.normal(0, self.p0_init_std, size=self.param_dim)
-            p_curr_np = (p_curr_np - p_curr_np.min()) / (p_curr_np.max() - p_curr_np.min())  # Normalize to [0, 1]
-            p_curr_np = p_curr_np * (self.max_x_bounds - self.min_x_bounds) + self.min_x_bounds  # Scale to [min_x_bounds, max_x_bounds]
-            
-            # Generate z for state
-            z_curr_np = np.random.normal(0, 1, size=self.latent_dim)
+        current_params_in_state = self._initialize_current_params_for_state().clone() # Shape: (param_dim)
+        final_ode_params = None
 
-            p_curr_torch = torch.tensor(p_curr_np, dtype=torch.float32)
-            z_torch_ep = torch.tensor(z_curr_np, dtype=torch.float32)
+        for t in range(self.T_horizon):
+            noise = torch.randn(self.noise_dim, device=self.device) # Shape: (noise_dim)
+            state_1d = torch.cat((noise, current_params_in_state.detach()), dim=0) # Shape: (state_dim)
+            state_batch = state_1d.unsqueeze(0) # Shape: (1, state_dim) for actor/critic
 
-            episode_total_reward = 0
+            with torch.no_grad(): # During data collection, no grad needed for actor/critic forward pass
+                mu_raw, log_std_raw = self.actor(state_batch) # mu_raw: (1, param_dim), log_std_raw: (1, param_dim)
+                std_raw = torch.exp(log_std_raw)
+                dist = Normal(mu_raw, std_raw)
+                action_raw = dist.sample() # Shape: (1, param_dim)
+                action_log_prob_raw = dist.log_prob(action_raw).sum(dim=-1) # Shape: (1)
+                val = self.critic(state_batch) # Shape: (1, 1)
 
-            for t_s in range(self.T_horizon):
-                # Use instance methods for lambda_max and reward
-                lambda_max_pt_val = self._get_lambda_max(p_curr_torch) 
-                
-                state_torch_flat = torch.cat((
-                    p_curr_torch, z_torch_ep,
-                    torch.tensor([lambda_max_pt_val], dtype=torch.float32),
-                    torch.tensor([t_s], dtype=torch.float32)
-                ))
+            ode_params = self._transform_to_bounded(action_raw) # Shape: (1, param_dim)
 
-                with torch.no_grad():
-                    action_mean, action_std = self.actor(state_torch_flat.unsqueeze(0))
-                    dist = Normal(action_mean, action_std)
-                    action = dist.sample()
-                    log_prob_action = dist.log_prob(action).sum(dim=-1)
+            if t == self.T_horizon - 1:
+                # Squeeze action_raw to 1D tensor for reward function
+                r = self.reward_function(ode_params.squeeze(0))
+                d = True
+                final_ode_params = ode_params.squeeze(0).detach()
+            else:
+                r = 0.0 # No intermediate rewards
+                d = False
 
-                batch_states.append(state_torch_flat)
-                batch_actions.append(action.squeeze(0))
-                batch_log_probs_actions.append(log_prob_action)
+            states.append(state_1d) # Store 1D state
+            actions_raw.append(action_raw.squeeze(0)) # Store 1D action_raw
+            log_probs_raw.append(action_log_prob_raw.squeeze(0)) # Store scalar log_prob
+            rewards.append(torch.tensor(r, device=self.device, dtype=torch.float32))
+            dones.append(torch.tensor(d, device=self.device, dtype=torch.bool))
+            values.append(val.squeeze()) # Store scalar value
 
-                action_clipped = torch.clamp(action.squeeze(0), self.action_clip_range[0], self.action_clip_range[1])
-                p_next_torch = p_curr_torch + action_clipped
-                p_next_torch = torch.clamp(p_next_torch, self.min_x_bounds, self.max_x_bounds)
-                
-                lambda_max_p_next_val = self._get_lambda_max(p_next_torch)
-                is_final_step = (t_s == self.T_horizon - 1)
-                # print(lambda_max_p_next_val) : for DEBUG
-                reward_val = self._compute_reward(lambda_max_p_next_val)
+            current_params_in_state = ode_params.squeeze(0) # Update for next state, Shape: (param_dim)
 
-                batch_rewards.append(torch.tensor([reward_val], dtype=torch.float32))
-                episode_total_reward += reward_val / self.T_horizon
+        # Print mean reward for the episode
+        mean_reward = torch.mean(torch.stack(rewards)).item()
+        # print(f"Mean reward for the episode: {mean_reward:.4f}")
 
-                next_state_torch_flat = torch.cat((
-                    p_next_torch, z_torch_ep,
-                    torch.tensor([lambda_max_p_next_val], dtype=torch.float32),
-                    torch.tensor([t_s + 1], dtype=torch.float32)
-                ))
-                batch_next_states.append(next_state_torch_flat)
-                batch_dones.append(torch.tensor([1.0 if is_final_step else 0.0], dtype=torch.float32))
-                p_curr_torch = p_next_torch
-            
-            all_episode_total_rewards.append(episode_total_reward)
+        # Convert lists to tensors
+        rollout_data = (
+            torch.stack(states),
+            torch.stack(actions_raw),
+            torch.stack(log_probs_raw),
+            torch.stack(rewards),
+            torch.stack(dones),
+            torch.stack(values)
+        )
+        return rollout_data, final_ode_params
 
-        # Concatenate collected data into batch tensors
-        final_batch_states = torch.stack(batch_states) if batch_states else torch.empty(0, self.state_dim)
-        final_batch_actions = torch.stack(batch_actions) if batch_actions else torch.empty(0, self.action_dim)
-        final_batch_log_probs = torch.stack(batch_log_probs_actions) if batch_log_probs_actions else torch.empty(0,1)
-        final_batch_rewards = torch.stack(batch_rewards) if batch_rewards else torch.empty(0,1)
-        final_batch_next_states = torch.stack(batch_next_states) if batch_next_states else torch.empty(0, self.state_dim)
-        final_batch_dones = torch.stack(batch_dones) if batch_dones else torch.empty(0,1)
-        
-        avg_episode_reward_val = np.mean(all_episode_total_rewards) if all_episode_total_rewards else 0
+    def update_policy(self, rollout_data):
+        states, actions_raw, old_log_probs_raw, rewards, dones, old_values = rollout_data
+        old_values = old_values.detach() # Ensure no gradients flow back to critic from here
 
-        return (final_batch_states, final_batch_actions, final_batch_log_probs, 
-                final_batch_rewards, final_batch_next_states, final_batch_dones,
-                avg_episode_reward_val)
+        # Calculate advantages and returns using GAE
+        advantages = torch.zeros_like(rewards, device=self.device)
+        returns = torch.zeros_like(rewards, device=self.device)
+        gae = 0
+        # next_val for the last state is 0 because the episode terminates
+        next_val = torch.tensor(0.0, device=self.device)
 
-    def _compute_gae(self, rewards, values, next_values, dones):
-        advantages = torch.zeros_like(rewards)
-        last_advantage = 0
-        if rewards.nelement() == 0: 
-             return torch.zeros_like(rewards), torch.zeros_like(values) 
+        for t in reversed(range(len(rewards))):
+            # if dones[t] is True, (1.0 - dones[t].float()) will be 0
+            delta = rewards[t] + self.gamma * next_val * (1.0 - dones[t].float()) - old_values[t]
+            gae = delta + self.gamma * self.gae_lambda * (1.0 - dones[t].float()) * gae
+            advantages[t] = gae
+            returns[t] = gae + old_values[t] # Q_t = A_t + V(s_t)
+            next_val = old_values[t]
 
-        for t in reversed(range(len(rewards))): 
-            is_terminal_transition = dones[t].item() > 0.5 
-            delta = rewards[t] + self.gamma * next_values[t] * (1.0 - dones[t]) - values[t]
-            advantages[t] = last_advantage = delta + self.gamma * self.gae_lambda * (1.0 - dones[t]) * last_advantage
-        returns = advantages + values
-        return advantages, returns
-
-    def update(self, trajectories_data):
-        states, actions, log_probs_old, rewards, next_states, dones, _ = trajectories_data
-        
-        if states.nelement() == 0: 
-            return 0.0, 0.0
-
-        with torch.no_grad():
-            values = self.critic(states)          
-            next_values = self.critic(next_states) 
-
-        advantages, returns = self._compute_gae(rewards, values, next_values, dones)
-        
-        if advantages.nelement() == 0: 
-             return 0.0, 0.0
-
+        # Normalize advantages
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
-        actor_total_loss_epoch = 0
-        critic_total_loss_epoch = 0
-
+        # Optimize policy and value network for K epochs
         for _ in range(self.ppo_epochs):
-            current_pi_mean, current_pi_std = self.actor(states)
-            dist_new = Normal(current_pi_mean, current_pi_std)
-            log_probs_new = dist_new.log_prob(actions).sum(dim=-1, keepdim=True)
-            entropy = dist_new.entropy().mean()
+            # Actor update
+            mu_raw, log_std_raw = self.actor(states)
+            std_raw = torch.exp(log_std_raw)
+            dist_new = Normal(mu_raw, std_raw)
+            new_log_probs_raw = dist_new.log_prob(actions_raw).sum(dim=-1)
 
-            ratios = torch.exp(log_probs_new - log_probs_old.detach()) 
-            
-            surr1 = ratios * advantages.detach() 
-            surr2 = torch.clamp(ratios, 1.0 - self.epsilon, 1.0 + self.epsilon) * advantages.detach()
-            actor_loss = -torch.min(surr1, surr2).mean() - self.entropy_coeff * entropy
+            ratios = torch.exp(new_log_probs_raw - old_log_probs_raw.detach())
+
+            surr1 = ratios * advantages
+            surr2 = torch.clamp(ratios, 1 - self.epsilon, 1 + self.epsilon) * advantages
+            actor_loss = -torch.min(surr1, surr2).mean()
+            # Optional: Add entropy bonus
+            # entropy = dist_new.entropy().sum(-1).mean()
+            # actor_loss -= 0.01 * entropy
+
 
             self.actor_optimizer.zero_grad()
             actor_loss.backward()
-            nn.utils.clip_grad_norm_(self.actor.parameters(), self.max_grad_norm)
+            # Optional: Gradient clipping for actor
+            torch.nn.utils.clip_grad_norm_(self.actor.parameters(), self.max_grad_norm)
             self.actor_optimizer.step()
-            actor_total_loss_epoch += actor_loss.item()
 
-            values_pred = self.critic(states) 
-            critic_loss = (returns.detach() - values_pred).pow(2).mean()
+            # Critic update
+            current_values = self.critic(states).squeeze(-1) # Shape: (T_horizon)
+            critic_loss = self.mse_loss(current_values, returns.detach())
 
             self.critic_optimizer.zero_grad()
             critic_loss.backward()
-            nn.utils.clip_grad_norm_(self.critic.parameters(), self.max_grad_norm)
+            # Optional: Gradient clipping for critic
+            torch.nn.utils.clip_grad_norm_(self.critic.parameters(), self.max_grad_norm)
             self.critic_optimizer.step()
-            critic_total_loss_epoch += critic_loss.item()
-        
-        avg_actor_loss = actor_total_loss_epoch / self.ppo_epochs
-        avg_critic_loss = critic_total_loss_epoch / self.ppo_epochs
-        return avg_actor_loss, avg_critic_loss
 
+    def train(self, num_training_iterations, output_path=None):
+        print(f"Training on {self.device}")
+        final_rewards = []
+        for iteration in range(num_training_iterations):
+            rollout_data_tuple, final_ode_params = self.collect_rollout_data()
+            self.update_policy(rollout_data_tuple)
 
-    def train(self, num_iterations, output_path_base="ppo_training_output"):
-        import os
-        os.makedirs(output_path_base, exist_ok=True)
-        
-        all_iter_avg_rewards = []
-        best_avg_reward = float('-inf')  # Initialize to negative infinity
-        best_actor_path = os.path.join(output_path_base, "best_actor.pth")
-        best_critic_path = os.path.join(output_path_base, "best_critic.pth")
-        
-        print(f"Starting PPO training for {num_iterations} iterations (serial execution).") 
-        print(f"State dim: {self.state_dim}, Action dim: {self.action_dim}, Latent (z) dim: {self.latent_dim}")
-        print(f"Num episodes per update: {self.num_episodes_per_update}, Horizon T: {self.T_horizon}")
-        print(f"p0 initialized with N(0, {self.p0_init_std**2}) and clamped to [{self.min_x_bounds}, {self.max_x_bounds}]")
+            if final_ode_params is not None:
+                final_reward = self.reward_function(final_ode_params)
+                final_rewards.append(final_reward)
+                if (iteration + 1) % 1 == 0: # Log every iteration
+                    print(f"Iteration {iteration+1}/{num_training_iterations}, Final Reward: {final_reward:.4f}")
+                    # print(f"   Final ODE Params: {final_ode_params.cpu().numpy()}")
+            # save the model every 2 iterations
+            if (iteration + 1) % 100 == 0:
+                torch.save(self.actor.state_dict(), output_path + f"actor_{iteration+1}.pth")
+                torch.save(self.critic.state_dict(), output_path + f"critic_{iteration+1}.pth")
+                print(f"Model saved at iteration {iteration+1}")
 
+        # save final rewards
+        if output_path is not None:
+            np.save(output_path + "final_rewards.npy", final_rewards)
+            print(f"Final rewards saved at {output_path}final_rewards.npy")
 
-        for iteration in range(num_iterations):
-            trajectories_data = self._collect_trajectories()
-            avg_episode_reward = trajectories_data[-1] 
-            
-            if trajectories_data[0].nelement() == 0 and self.num_episodes_per_update > 0:
-                print(f"Iter {iteration:04d}: No trajectories collected. Skipping update. Avg Ep Reward: {avg_episode_reward:.4f}")
-                all_iter_avg_rewards.append(avg_episode_reward) 
-                continue 
-
-            actor_loss, critic_loss = self.update(trajectories_data)
-            all_iter_avg_rewards.append(avg_episode_reward)
-        
-            print(f"Iter {iteration:04d}: Avg Ep Reward: {avg_episode_reward:.4f}, "
-                    f"Actor Loss: {actor_loss:.4f}, Critic Loss: {critic_loss:.4f}")
-            
-             # Save the best model if the current average reward is the highest
-            if avg_episode_reward > best_avg_reward:
-                best_avg_reward = avg_episode_reward
-                torch.save(self.actor.state_dict(), best_actor_path)
-                torch.save(self.critic.state_dict(), best_critic_path)
-                print(f"Iter {iteration:04d}: New best model saved with Avg Ep Reward: {best_avg_reward:.4f}")
-
-            if iteration % 50 == 0 or iteration == num_iterations -1 : 
-                actor_path = os.path.join(output_path_base, f"actor_iter_{iteration}.pth")
-                critic_path = os.path.join(output_path_base, f"critic_iter_{iteration}.pth")
-                torch.save(self.actor.state_dict(), actor_path)
-                torch.save(self.critic.state_dict(), critic_path)
-        
         print("Training finished.")
-        return all_iter_avg_rewards
-
-def evaluate_policy_incidence(ppo_instance, actor_path, num_trials=1):
-    """
-    Evaluate the policy incidence using a pre-trained actor model.
-
-    Args:
-        ppo_instance: The PPORefinement instance.
-        actor_path: Path to the pre-trained actor model (best_actor.pth).
-        num_trials: Number of trials to evaluate the policy incidence.
-
-    Returns:
-        incidence_rate: The rate of valid models.
-        all_final_params: List of final parameters for valid models.
-    """
-    # Load the pre-trained actor model
-    ppo_instance.actor.load_state_dict(torch.load(actor_path))
-    ppo_instance.actor.eval()  # Set to evaluation mode
-
-    valid_count = 0
-    all_final_params = []
-
-    for i in range(num_trials):
-        with torch.no_grad():
-            # Sample initial p0
-            p0_np = np.random.normal(0, ppo_instance.p0_init_std, size=ppo_instance.param_dim)
-            p0_np = (p0_np - p0_np.min()) / (p0_np.max() - p0_np.min())  # Normalize
-            p0_np = p0_np * (ppo_instance.max_x_bounds - ppo_instance.min_x_bounds) + ppo_instance.min_x_bounds
-            p_curr = torch.tensor(p0_np, dtype=torch.float32)
-
-            # Sample latent z
-            z = torch.tensor(np.random.normal(0, 1, size=ppo_instance.latent_dim), dtype=torch.float32)
-
-            for t_s in range(ppo_instance.T_horizon):
-                lambda_max_val = ppo_instance._get_lambda_max(p_curr)
-
-                state_torch = torch.cat((
-                    p_curr,
-                    z,
-                    torch.tensor([lambda_max_val], dtype=torch.float32),
-                    torch.tensor([t_s], dtype=torch.float32)
-                )).unsqueeze(0)
-
-                action_mean, action_std = ppo_instance.actor(state_torch)
-                dist = Normal(action_mean, action_std)
-                action = dist.sample()
-                action_clipped = torch.clamp(action.squeeze(0), ppo_instance.action_clip_range[0], ppo_instance.action_clip_range[1])
-                p_next = p_curr + action_clipped
-                p_next = torch.clamp(p_next, ppo_instance.min_x_bounds, ppo_instance.max_x_bounds)
-                p_curr = p_next
-
-            # Final p_curr after T steps
-            p_final_np = p_curr.detach().cpu().numpy()
-            ppo_instance.chk_jcbn._prepare_parameters([p_final_np], ppo_instance.names_km_full)
-
-            # max eigenvalue check
-            max_eig_list = ppo_instance.chk_jcbn.calc_eigenvalues_recal_vmax()
-            max_eig_val = max_eig_list[0]
-            is_valid = max_eig_val <= ppo_instance.eig_partition_final_reward
-
-            if is_valid:
-                valid_count += 1
-                all_final_params.append(p_final_np)
-
-    incidence_rate = valid_count / num_trials
-    print(f"Incidence Rate (valid models): {incidence_rate:.4f} ({valid_count}/{num_trials})")
-    return incidence_rate, all_final_params
+        # You can return the trained actor or save it
+        return self.actor, final_rewards
