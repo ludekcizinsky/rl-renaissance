@@ -109,9 +109,9 @@ class check_jacobian():
 
     def _load_models(self,met_model,exp_id, ss_idx):
 
-        path_to_tmodel = f'models/{met_model}/thermo/varma_{exp_id}'
-        path_to_kmodel = f'models/{met_model}/kinetic/kin_varma_curated.yaml'
-        path_to_samples = f'models/{met_model}/steady_state_samples/samples_{exp_id}.csv'
+        path_to_tmodel = f'data/{met_model}/thermo/varma_{exp_id}'
+        path_to_kmodel = f'data/{met_model}/kinetic/kin_varma_curated.yaml'
+        path_to_samples = f'data/{met_model}/steady_state_samples/samples_{exp_id}.csv'
 
         self.tmodel = load_json_model(path_to_tmodel)
         self.kmodel = load_yaml_model(path_to_kmodel)
@@ -151,8 +151,8 @@ class check_jacobian():
 
     def _load_ktmodels(self, met_model, exp_id):
 
-        path_to_tmodel = f'models/{met_model}/thermo/varma_{exp_id}'
-        path_to_kmodel = f'models/{met_model}/kinetic/kin_varma_curated.yaml'
+        path_to_tmodel = f'data/{met_model}/thermo/varma_{exp_id}'
+        path_to_kmodel = f'data/{met_model}/kinetic/kin_varma_curated.yaml'
 
         self.tmodel = load_json_model(path_to_tmodel)
         self.kmodel = load_yaml_model(path_to_kmodel)
@@ -161,7 +161,7 @@ class check_jacobian():
 
     def _load_ssprofile(self, met_model,exp_id,ss_idx):
 
-        path_to_samples = f'models/{met_model}/steady_state_samples/samples_{exp_id}.csv'
+        path_to_samples = f'data/{met_model}/steady_state_samples/samples_{exp_id}.csv'
         self.samples = pd.read_csv(path_to_samples, header=0, index_col=0).iloc[ss_idx, 0:]
 
         flux_series = load_fluxes(self.samples, self.tmodel, self.kmodel,
