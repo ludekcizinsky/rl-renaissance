@@ -13,7 +13,7 @@ logger:
 
 
 paths:
-  names_km: models/varma_ecoli_shikki/parameter_names_km_fdp1.pkl
+  names_km: data/varma_ecoli_shikki/parameter_names_km_fdp1.pkl
   output_dir: /home/renaissance/output 
   met_model_name: varma_ecoli_shikki
 

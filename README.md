@@ -27,7 +27,7 @@ chmod -R 777 /home/rl_team/ludek/output
 Finally, start the docker container using the below command (make sure to change the output directory to the one you created earlier):
 
 ```bash
-sudo docker run --rm -it -v "$(pwd)":/home/renaissance/work -v "/home/rl_team/ludek/output:/home/renaissance/output"  ludekcizinsky/renaissance_with_ml
+sudo docker run --rm -it -v "$(pwd)":/home/renaissance/work -v "/home/rl_team/ludek/output:/home/renaissance/output" ludekcizinsky/renaissance_with_ml
 ```
 
 If things go well, you should be able to execute the following command to check if the image is working:
