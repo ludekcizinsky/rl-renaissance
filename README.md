@@ -58,6 +58,26 @@ If things go well, you should be able to execute the following command to check 
 python -c "import skimpy; import torch;print('Success')"
 ```
 
+### On node provided by Ilias
+
+Assuming you have Docker desktop installed, you can run the following commands to pull the image locally (takes a couple of minutes):
+
+```bash
+docker pull ludekcizinsky/renaissance_with_ml:latest
+```
+
+Then, start the docker container using the below command (make sure to change the path `path_to_local_output` accordingly):
+
+```bash
+sudo docker run --rm -it -u $(id -u):$(id -g) -v "$(pwd)":/home/renaissance/work ludekcizinsky/renaissance_with_ml
+```
+
+If things go well, you should be able to execute the following command to check if the image is working:
+
+```bash
+python -c "import skimpy; import torch;print('Success')"
+```
+
 ## Running the code
 
 ### Baseline code
