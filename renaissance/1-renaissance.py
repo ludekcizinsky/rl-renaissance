@@ -75,7 +75,7 @@ n_threads = int(configs['EVOSTRAT']['n_threads'])
 
 output_path = configs['PATHS']['output_path']
 met_model = configs['PATHS']['met_model']
-names_km = hp.load_pkl(f'models/{met_model}/parameter_names_km_fdp1.pkl')
+names_km = hp.load_pkl(f'data/{met_model}/parameter_names_km_fdp1.pkl')
 
 reward_flag = int(configs['REWARDS']['reward_flag'])
 eig_partition = float(configs['REWARDS']['eig_partition'])

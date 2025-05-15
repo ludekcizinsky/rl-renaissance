@@ -9,7 +9,7 @@ Generation of kinetic models using RL.
 First, pull the image from the Docker registry (this should be already done, but just in case):
 
 ```bash
-docker pull ludekcizinsky/renaissance_with_ml:latest
+sudo docker pull ludekcizinsky/renaissance_with_ml:latest
 ```
 
 Next, in your home directory, create a directory for the output. For instance:
@@ -24,7 +24,7 @@ Make sure that the folder is writable by the user:
 chmod -R 777 /home/rl_team/ludek/output
 ```
 
-Finally, start the docker container using the below command (make sure to change the output directory to the one you created earlier):
+Assuming you have cloned our rl repo and you are currently in it, you can start the docker container using the below command (make sure to change the output directory to the one you created earlier):
 
 ```bash
 sudo docker run --rm -it -v "$(pwd)":/home/renaissance/work -v "/home/rl_team/ludek/output:/home/renaissance/output" ludekcizinsky/renaissance_with_ml
