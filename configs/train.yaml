@@ -5,6 +5,7 @@ defaults:
 seed: 42
 device: cpu
 
+# for now ignore, we don't use wandb yet
 logger:
   project: rl-renaissance
   entity: ludekcizinsky
@@ -12,19 +13,17 @@ logger:
 
 
 paths:
-  # Metabolic model being analyzed. All data are loaded accordingly from the folder '/Models' in supplementary data
   names_km: models/varma_ecoli_shikki/parameter_names_km_fdp1.pkl
   output_dir: /home/renaissance/output 
   met_model_name: varma_ecoli_shikki
 
 constraints:
-  ## Custom constraints
-  # Minimum value of generated Kms = exp(-25)
+  # minimum value of generated Kms = exp(-25)
   min_km: -25 
-  # Maximum value of generated Kms = exp(3)
+  # maximum value of generated Kms = exp(3)
   max_km: 3
 
-  # Index of the steady state to generate kinetic models around (there are 5000 steady states in the data provided)
+  # index of the steady state to generate kinetic models around (there are 5000 steady states in the data provided)
   ss_idx: 1712
 
 reward:

@@ -4,7 +4,39 @@ Generation of kinetic models using RL.
 
 ## Setting up docker container
 
-### Izar
+### On node provided by Ilias (recommended)
+
+First, pull the image from the Docker registry (this should be already done, but just in case):
+
+```bash
+docker pull ludekcizinsky/renaissance_with_ml:latest
+```
+
+Next, in your home directory, create a directory for the output. For instance:
+
+```bash
+mkdir -p /home/rl_team/ludek/output
+```
+
+Make sure that the folder is writable by the user:
+
+```bash
+chmod -R 777 /home/rl_team/ludek/output
+```
+
+Finally, start the docker container using the below command (make sure to change the output directory to the one you created earlier):
+
+```bash
+sudo docker run --rm -it -v "$(pwd)":/home/renaissance/work -v "/home/rl_team/ludek/output:/home/renaissance/output"  ludekcizinsky/renaissance_with_ml
+```
+
+If things go well, you should be able to execute the following command to check if the image is working:
+
+```bash
+python -c "import skimpy; import torch;print('Success')"
+```
+
+### Izar (not updated)
 
 First, pull the image from the Docker registry using apptainer (takes a couple of minutes):
 
@@ -26,41 +58,29 @@ If things go well, you should be able to execute the following command to check 
 python -c "import skimpy; import torch;print('Success')"
 ```
 
-### Local
-
-Assuming you have Docker desktop installed, you can run the following commands to pull the image locally (takes a couple of minutes):
-
-```bash
-docker pull ludekcizinsky/renaissance_with_ml:latest
-```
-
-Then, start the docker container using the below command (make sure to change the path `path_to_local_output` accordingly):
-
-```bash
-docker run --rm -it -v "$(pwd)":/home/renaissance/work renaissance_with_ml:latest
-```
-
-If things go well, you should be able to execute the following command to check if the image is working:
-
-```bash
-python -c "import skimpy; import torch;print('Success')"
-```
-
 ## Running the code
 
-Once you have the Docker container running, you can run the orirignal baseline code as follows:
+### Baseline code
+
+Once you have the Docker container running, you can run the original baseline code as follows:
 
 ```bash
 cd renaissance
 python 1-renaissance.py
 ```
 
-However, since loading the data takes around one minute, you can execute the code in a Jupyter notebook instead or using ipython:
+### RL code
+
+To run the training with default configuration (see `configs/train.yaml`), you can use the following command:
 
 ```bash
-cd renaissance
-ipython
-run 1-renaissance.py
+python train.py
 ```
 
-todo: once we have the renaissance code running, we can add info on how to run the RL code.
+In practice, however, you want to experiment with different configurations. You can override the default configuration by using the following command:
+
+```bash
+python train.py method.actor_lr=1e-4 method.latent_dim=256
+```
+
+
