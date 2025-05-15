@@ -5,6 +5,7 @@ import torch.optim as optim
 from helpers.buffers import TrajectoryBuffer
 from helpers.env import KineticEnv
 
+from tqdm import tqdm
 
 class PolicyNetwork(nn.Module):
     def __init__(self, cfg):
@@ -57,7 +58,7 @@ class ValueNetwork(nn.Module):
 
     def forward(self, x):
         value = self.net(x)
-        return value
+        return value.squeeze()
 
 class PPOAgent:
     def __init__(self, cfg, logger):
@@ -74,11 +75,11 @@ class PPOAgent:
         buf = TrajectoryBuffer()
 
         state = env.reset()
-        for _ in range(self.cfg.training.max_steps_per_episode):
+        for _ in tqdm(range(self.cfg.training.max_steps_per_episode), desc="Collecting trajectory"):
             mean, std = self.policy_net(state)
-            action = torch.normal(mean, std)
-            log_prob = (-((action - mean)**2) / (2*std**2)
-                        - std.log() - 0.5*torch.log(2*torch.pi)).sum()
+            dist = torch.distributions.Normal(mean, std)
+            action = dist.rsample()
+            log_prob = dist.log_prob(action).sum()
             value = self.value_net(state)
 
             next_state, reward, done = env.step(action)
