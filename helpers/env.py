@@ -63,39 +63,3 @@ class KineticEnv:
     def seed(self, seed: int):
         """Set random seed for reproducibility."""
         torch.manual_seed(seed)
-
-
-# Example usage:
-if __name__ == "__main__":
-    # Hidden target in [0,10]^4
-    target = torch.tensor([2.5, 7.3, 1.1, 4.8])
-    def blackbox_reward(x):
-        return -torch.norm(x - target).item()
-
-    # reset_seed ensures same initial state every reset
-    env = KineticEnv(
-        param_dim=4,
-        min_val=0,
-        max_val=10,
-        reward_fn=blackbox_reward,
-        max_steps=50,
-        reset_seed=12345,
-    )
-    env.seed(999)
-
-    # Two resets yield identical states:
-    s1 = env.reset()
-    s2 = env.reset()
-    print("Deterministic resets equal?", torch.allclose(s1, s2))
-
-    total_reward = 0.0
-    done = False
-    state = s1
-    while not done:
-        # simple greedy step toward target
-        direction = (target - state)
-        action = direction / (direction.norm() + 1e-8) * 0.2
-        state, r, done, _ = env.step(action)
-        total_reward += r
-
-    print("Episode finished. Total reward:", total_reward)

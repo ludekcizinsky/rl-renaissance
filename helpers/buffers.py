@@ -20,10 +20,10 @@ class TrajectoryBuffer:
             first = seq[0]
             if isinstance(first, torch.Tensor):
                 # stack tensors (e.g. actions, values, log_probs)
-                out[key] = torch.stack(seq)
+                out[key] = torch.stack(seq).detach()
             else:
                 # tensorify numeric types (e.g. rewards, dones, raw states)
-                out[key] = torch.tensor(seq, dtype=torch.float32)
+                out[key] = torch.tensor(seq, dtype=torch.float32).detach()
         return out
 
     def clear(self):
