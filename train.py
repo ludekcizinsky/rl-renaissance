@@ -38,16 +38,29 @@ def train(cfg: DictConfig):
 
     # Initialize PPO agent (actor and critic)
     ppo_agent = PPOAgent(cfg, logger)
+
+    best_last_reward = float('-inf')
+    best_actor_path = f"{cfg.paths.output_dir}/best_actor.pth"
+    best_critic_path = f"{cfg.paths.output_dir}/best_critic.pth"
    
     # Training loop
     for episode in range(cfg.training.num_episodes):
         trajectory = ppo_agent.collect_trajectory(env)
         rewards = trajectory["rewards"]
         min_rew, max_rew, mean_rew = rewards.min(), rewards.max(), rewards.mean()
-        print(f"Episode {episode+1}/{cfg.training.num_episodes} - Min reward: {min_rew:.4f}, Max reward: {max_rew:.4f}, Mean reward: {mean_rew:.4f}")
+        last_reward = rewards[-1]
+        print(f"Episode {episode+1}/{cfg.training.num_episodes} - Min reward: {min_rew:.4f}, Max reward: {max_rew:.4f}, Mean reward: {mean_rew:.4f}, Last reward: {last_reward:.4f}")
 
         policy_loss, value_loss, entropy = ppo_agent.update(trajectory)
         print(f"Episode {episode+1}/{cfg.training.num_episodes} - Policy loss: {policy_loss:.4f}, Value loss: {value_loss:.4f}, Entropy: {entropy:.4f}")
+
+        if last_reward > best_last_reward:
+            best_last_reward = last_reward
+            import os, torch
+            os.makedirs(cfg.paths.output_dir, exist_ok=True)
+            torch.save(ppo_agent.policy_net.state_dict(), best_actor_path)
+            torch.save(ppo_agent.value_net.state_dict(), best_critic_path)
+            print(f"Best model saved at episode {episode+1} with mean reward {best_last_reward:.4f}")
 
 
 if __name__ == "__main__":

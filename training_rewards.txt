@@ -1,0 +1,243 @@
+-method:
+  parameter_dim: 384
+  latent_dim: 99
+  name: ppo_refinement
+  actor_lr: 0.0003
+  critic_lr: 0.001
+  discount_factor: 0.99
+  gae_lambda: 0.98
+  clip_eps: 0.2
+  value_loss_weight: 0.5
+  entropy_loss_weight: 0.0
+seed: 42
+device: cpu
+logger:
+  project: rl-renaissance
+  entity: ludekcizinsky
+  tags:
+  - dev
+paths:
+  names_km: data/varma_ecoli_shikki/parameter_names_km_fdp1.pkl
+  output_dir: /home/renaissance/work/output
+  met_model_name: varma_ecoli_shikki
+constraints:
+  min_km: -25
+  max_km: 3
+  ss_idx: 1712
+reward:
+  eig_partition: -2.5
+env:
+  p0_init_mean: 0
+  p0_init_std: 0.1
+  p_size: 384
+training:
+  num_episodes: 100
+  max_steps_per_episode: 50
+  batch_size: 25
+  num_epochs: 10
+  max_grad_norm: 0.5
+
+--------------------------------------------------
+FYI: Loading kinetic and thermodynamic data.
+Episode 1/100 - Min reward: 0.0010, Max reward: 0.1007, Mean reward: 0.0662
+Episode 1/100 - Policy loss: 0.3503, Value loss: 1.2551, Entropy: 354.8833
+Episode 2/100 - Min reward: 0.0010, Max reward: 0.0800, Mean reward: 0.0414
+Episode 2/100 - Policy loss: 0.3274, Value loss: 15.4163, Entropy: 357.0471
+Episode 3/100 - Min reward: 0.0010, Max reward: 0.1083, Mean reward: 0.0345
+Episode 3/100 - Policy loss: 0.2557, Value loss: 13.4735, Entropy: 358.9633
+Episode 4/100 - Min reward: 0.0010, Max reward: 0.1104, Mean reward: 0.0583
+Episode 4/100 - Policy loss: 0.1398, Value loss: 18.1896, Entropy: 360.5748
+Episode 5/100 - Min reward: 0.0010, Max reward: 0.1164, Mean reward: 0.0861
+Episode 5/100 - Policy loss: 0.1049, Value loss: 5.5805, Entropy: 361.7135
+Episode 6/100 - Min reward: 0.0010, Max reward: 0.1489, Mean reward: 0.0643
+Episode 6/100 - Policy loss: -0.0178, Value loss: 4.5419, Entropy: 362.5379
+Episode 7/100 - Min reward: 0.0010, Max reward: 0.2027, Mean reward: 0.1035
+Episode 7/100 - Policy loss: -0.1452, Value loss: 5.1447, Entropy: 363.0791
+Episode 8/100 - Min reward: 0.0124, Max reward: 0.2427, Mean reward: 0.0976
+Episode 8/100 - Policy loss: 0.2741, Value loss: 3.7437, Entropy: 363.5057
+Episode 9/100 - Min reward: 0.0022, Max reward: 0.1029, Mean reward: 0.0806
+Episode 9/100 - Policy loss: 0.0254, Value loss: 21.5890, Entropy: 363.8717
+Episode 10/100 - Min reward: 0.0010, Max reward: 0.1629, Mean reward: 0.0905
+Episode 10/100 - Policy loss: -0.0484, Value loss: 7.1503, Entropy: 364.2969
+Episode 11/100 - Min reward: 0.0797, Max reward: 0.1310, Mean reward: 0.0868
+Episode 11/100 - Policy loss: 0.0217, Value loss: 13.6439, Entropy: 364.8332
+Episode 12/100 - Min reward: 0.0010, Max reward: 0.7610, Mean reward: 0.0848
+Episode 12/100 - Policy loss: 0.0920, Value loss: 2.5874, Entropy: 365.2927
+Episode 13/100 - Min reward: 0.0010, Max reward: 0.1029, Mean reward: 0.0532
+Episode 13/100 - Policy loss: -0.0608, Value loss: 26.8669, Entropy: 365.5720
+Episode 14/100 - Min reward: 0.0967, Max reward: 0.1985, Mean reward: 0.1315
+Episode 14/100 - Policy loss: 0.0168, Value loss: 71.8131, Entropy: 365.8122
+Episode 15/100 - Min reward: 0.0982, Max reward: 0.1198, Mean reward: 0.1008
+Episode 15/100 - Policy loss: -0.1032, Value loss: 14.4071, Entropy: 366.1209
+Episode 16/100 - Min reward: 0.0793, Max reward: 0.1117, Mean reward: 0.0839
+Episode 16/100 - Policy loss: 0.0888, Value loss: 20.8260, Entropy: 366.3363
+Episode 17/100 - Min reward: 0.0145, Max reward: 0.2263, Mean reward: 0.1814
+Episode 17/100 - Policy loss: -0.0618, Value loss: 50.4953, Entropy: 366.5290
+Episode 18/100 - Min reward: 0.1083, Max reward: 0.2015, Mean reward: 0.1545
+Episode 18/100 - Policy loss: -0.0482, Value loss: 7.8325, Entropy: 366.8018
+Episode 19/100 - Min reward: 0.1044, Max reward: 0.3389, Mean reward: 0.1557
+Episode 19/100 - Policy loss: 0.1032, Value loss: 23.3203, Entropy: 367.0557
+Episode 20/100 - Min reward: 0.0010, Max reward: 0.1894, Mean reward: 0.0460
+Episode 20/100 - Policy loss: -0.0455, Value loss: 8.5617, Entropy: 367.3359
+Episode 21/100 - Min reward: 0.0010, Max reward: 0.1472, Mean reward: 0.0967
+Episode 21/100 - Policy loss: -0.1456, Value loss: 7.3889, Entropy: 367.6281
+Episode 22/100 - Min reward: 0.0010, Max reward: 0.2143, Mean reward: 0.0924
+Episode 22/100 - Policy loss: -0.0316, Value loss: 19.0941, Entropy: 367.9051
+Episode 23/100 - Min reward: 0.0010, Max reward: 0.1137, Mean reward: 0.0734
+Episode 23/100 - Policy loss: 0.0730, Value loss: 12.3220, Entropy: 368.0835
+Episode 24/100 - Min reward: 0.0010, Max reward: 0.2288, Mean reward: 0.0677
+Episode 24/100 - Policy loss: -0.2553, Value loss: 31.1482, Entropy: 368.4001
+Episode 25/100 - Min reward: 0.0010, Max reward: 0.3139, Mean reward: 0.1268
+Episode 25/100 - Policy loss: -0.0018, Value loss: 13.6979, Entropy: 368.7481
+Episode 26/100 - Min reward: 0.0272, Max reward: 0.2287, Mean reward: 0.1349
+Episode 26/100 - Policy loss: -0.0938, Value loss: 59.4248, Entropy: 368.9576
+Episode 27/100 - Min reward: 0.0683, Max reward: 0.1195, Mean reward: 0.1080
+Episode 27/100 - Policy loss: -0.2724, Value loss: 20.9259, Entropy: 369.1497
+Episode 28/100 - Min reward: 0.0010, Max reward: 0.2405, Mean reward: 0.1110
+Episode 28/100 - Policy loss: -0.3579, Value loss: 27.2115, Entropy: 369.4642
+Episode 29/100 - Min reward: 0.0010, Max reward: 0.2469, Mean reward: 0.1848
+Episode 29/100 - Policy loss: -0.2649, Value loss: 17.2053, Entropy: 369.6448
+Episode 30/100 - Min reward: 0.0010, Max reward: 0.2517, Mean reward: 0.1736
+Episode 30/100 - Policy loss: -0.2785, Value loss: 16.5953, Entropy: 369.8351
+Episode 31/100 - Min reward: 0.1368, Max reward: 0.2459, Mean reward: 0.2109
+Episode 31/100 - Policy loss: -0.0086, Value loss: 28.8865, Entropy: 370.0248
+Episode 32/100 - Min reward: 0.0545, Max reward: 0.2402, Mean reward: 0.1790
+Episode 32/100 - Policy loss: -0.0411, Value loss: 14.9906, Entropy: 370.3247
+Episode 33/100 - Min reward: 0.0010, Max reward: 0.2367, Mean reward: 0.1599
+Episode 33/100 - Policy loss: -0.3865, Value loss: 34.3618, Entropy: 370.5392
+Episode 34/100 - Min reward: 0.0010, Max reward: 0.2388, Mean reward: 0.1433
+Episode 34/100 - Policy loss: -0.0341, Value loss: 0.7977, Entropy: 370.7674
+Episode 35/100 - Min reward: 0.0010, Max reward: 0.2292, Mean reward: 0.0923
+Episode 35/100 - Policy loss: -0.0369, Value loss: 1.9422, Entropy: 371.0747
+Episode 36/100 - Min reward: 0.1124, Max reward: 0.2336, Mean reward: 0.2132
+Episode 36/100 - Policy loss: -0.0375, Value loss: 4.6058, Entropy: 371.3733
+Episode 37/100 - Min reward: 0.0229, Max reward: 0.2804, Mean reward: 0.1233
+Episode 37/100 - Policy loss: -0.0835, Value loss: 12.2988, Entropy: 371.6566
+Episode 38/100 - Min reward: 0.1276, Max reward: 0.2410, Mean reward: 0.2171
+Episode 38/100 - Policy loss: 0.0589, Value loss: 42.1211, Entropy: 371.7994
+Episode 39/100 - Min reward: 0.0010, Max reward: 0.1964, Mean reward: 0.0788
+Episode 39/100 - Policy loss: -0.0726, Value loss: 9.4074, Entropy: 371.9057
+Episode 40/100 - Min reward: 0.0011, Max reward: 0.2725, Mean reward: 0.2264
+Episode 40/100 - Policy loss: -0.1348, Value loss: 6.5666, Entropy: 372.1006
+Episode 41/100 - Min reward: 0.0010, Max reward: 0.2642, Mean reward: 0.1166
+Episode 41/100 - Policy loss: -0.2634, Value loss: 5.5783, Entropy: 372.5414
+Episode 42/100 - Min reward: 0.0022, Max reward: 0.2409, Mean reward: 0.2156
+Episode 42/100 - Policy loss: 0.0610, Value loss: 6.2993, Entropy: 372.9641
+Episode 43/100 - Min reward: 0.0010, Max reward: 0.2705, Mean reward: 0.1096
+Episode 43/100 - Policy loss: -0.1753, Value loss: 14.0015, Entropy: 373.1809
+Episode 44/100 - Min reward: 0.0010, Max reward: 0.2402, Mean reward: 0.1040
+Episode 44/100 - Policy loss: -0.0729, Value loss: 3.0614, Entropy: 373.4722
+Episode 45/100 - Min reward: 0.0533, Max reward: 0.1953, Mean reward: 0.1727
+Episode 45/100 - Policy loss: -0.0366, Value loss: 4.7551, Entropy: 373.7673
+Episode 46/100 - Min reward: 0.0010, Max reward: 0.2350, Mean reward: 0.1331
+Episode 46/100 - Policy loss: -0.1300, Value loss: 5.0557, Entropy: 373.9400
+Episode 47/100 - Min reward: 0.0010, Max reward: 0.3129, Mean reward: 0.1302
+Episode 47/100 - Policy loss: -0.2497, Value loss: 2.7312, Entropy: 374.1527
+Episode 48/100 - Min reward: 0.0010, Max reward: 0.2125, Mean reward: 0.1738
+Episode 48/100 - Policy loss: -0.2348, Value loss: 2.3383, Entropy: 374.4191
+Episode 49/100 - Min reward: 0.0832, Max reward: 0.1956, Mean reward: 0.1760
+Episode 49/100 - Policy loss: -0.1444, Value loss: 0.6969, Entropy: 374.6567
+Episode 50/100 - Min reward: 0.0010, Max reward: 0.0857, Mean reward: 0.0572
+Episode 50/100 - Policy loss: -0.0822, Value loss: 1.6134, Entropy: 374.9273
+Episode 51/100 - Min reward: 0.0010, Max reward: 0.2180, Mean reward: 0.1392
+Episode 51/100 - Policy loss: -0.0724, Value loss: 2.9255, Entropy: 375.2310
+Episode 52/100 - Min reward: 0.0167, Max reward: 0.2291, Mean reward: 0.1658
+Episode 52/100 - Policy loss: -0.2196, Value loss: 2.8485, Entropy: 375.4608
+Episode 53/100 - Min reward: 0.0010, Max reward: 0.1987, Mean reward: 0.1576
+Episode 53/100 - Policy loss: -0.1104, Value loss: 2.2689, Entropy: 375.7355
+Episode 54/100 - Min reward: 0.0010, Max reward: 0.2036, Mean reward: 0.1682
+Episode 54/100 - Policy loss: -0.4065, Value loss: 0.7511, Entropy: 376.2366
+Episode 55/100 - Min reward: 0.0010, Max reward: 0.1953, Mean reward: 0.1381
+Episode 55/100 - Policy loss: -0.2400, Value loss: 1.9246, Entropy: 376.6667
+Episode 56/100 - Min reward: 0.0010, Max reward: 0.2580, Mean reward: 0.1928
+Episode 56/100 - Policy loss: -0.5082, Value loss: 18.7916, Entropy: 377.0752
+Episode 57/100 - Min reward: 0.0010, Max reward: 0.1954, Mean reward: 0.1186
+Episode 57/100 - Policy loss: -0.0980, Value loss: 33.1596, Entropy: 377.3994
+Episode 58/100 - Min reward: 0.0010, Max reward: 0.2249, Mean reward: 0.1373
+Episode 58/100 - Policy loss: -0.1219, Value loss: 2.3852, Entropy: 377.6162
+Episode 59/100 - Min reward: 0.0554, Max reward: 0.1946, Mean reward: 0.1600
+Episode 59/100 - Policy loss: -0.2132, Value loss: 7.3797, Entropy: 377.7715
+Episode 60/100 - Min reward: 0.0775, Max reward: 0.1946, Mean reward: 0.1501
+Episode 60/100 - Policy loss: -0.3200, Value loss: 2.4001, Entropy: 377.9883
+Episode 61/100 - Min reward: 0.0010, Max reward: 0.4346, Mean reward: 0.2118
+Episode 61/100 - Policy loss: -0.1393, Value loss: 4.9404, Entropy: 378.2827
+Episode 62/100 - Min reward: 0.0010, Max reward: 0.1953, Mean reward: 0.1212
+Episode 62/100 - Policy loss: -0.0790, Value loss: 2.1897, Entropy: 378.4980
+Episode 63/100 - Min reward: 0.1170, Max reward: 0.2630, Mean reward: 0.1924
+Episode 63/100 - Policy loss: -0.0047, Value loss: 1.9098, Entropy: 378.7644
+Episode 64/100 - Min reward: 0.0010, Max reward: 0.2013, Mean reward: 0.1219
+Episode 64/100 - Policy loss: -0.0956, Value loss: 37.4846, Entropy: 378.9799
+Episode 65/100 - Min reward: 0.0010, Max reward: 0.3272, Mean reward: 0.1914
+Episode 65/100 - Policy loss: -0.2695, Value loss: 7.2341, Entropy: 379.1955
+Episode 66/100 - Min reward: 0.0547, Max reward: 0.6812, Mean reward: 0.3413
+Episode 66/100 - Policy loss: -0.1494, Value loss: 2.4155, Entropy: 379.4867
+Episode 67/100 - Min reward: 0.0010, Max reward: 0.3824, Mean reward: 0.2329
+Episode 67/100 - Policy loss: -0.4166, Value loss: 1.9158, Entropy: 379.7780
+Episode 68/100 - Min reward: 0.0010, Max reward: 0.5864, Mean reward: 0.3342
+Episode 68/100 - Policy loss: -0.2064, Value loss: 6.2311, Entropy: 379.9930
+Episode 69/100 - Min reward: 0.0010, Max reward: 0.4098, Mean reward: 0.0809
+Episode 69/100 - Policy loss: -0.2616, Value loss: 18.2486, Entropy: 380.2406
+Episode 70/100 - Min reward: 0.0181, Max reward: 0.1948, Mean reward: 0.1575
+Episode 70/100 - Policy loss: -0.1997, Value loss: 5.9702, Entropy: 380.4901
+Episode 71/100 - Min reward: 0.0010, Max reward: 0.1960, Mean reward: 0.1366
+Episode 71/100 - Policy loss: -0.2706, Value loss: 30.1864, Entropy: 380.7398
+Episode 72/100 - Min reward: 0.0010, Max reward: 0.3599, Mean reward: 0.2103
+Episode 72/100 - Policy loss: -0.3247, Value loss: 14.9514, Entropy: 380.9479
+Episode 73/100 - Min reward: 0.0010, Max reward: 0.7130, Mean reward: 0.3758
+Episode 73/100 - Policy loss: -0.2252, Value loss: 27.1778, Entropy: 381.1913
+Episode 74/100 - Min reward: 0.0010, Max reward: 0.3491, Mean reward: 0.2652
+Episode 74/100 - Policy loss: -0.1257, Value loss: 11.4119, Entropy: 381.4638
+Episode 75/100 - Min reward: 0.0010, Max reward: 0.5549, Mean reward: 0.2962
+Episode 75/100 - Policy loss: -0.2916, Value loss: 6.4961, Entropy: 381.7760
+Episode 76/100 - Min reward: 0.0010, Max reward: 0.3176, Mean reward: 0.1964
+Episode 76/100 - Policy loss: -0.3038, Value loss: 11.0962, Entropy: 382.0918
+Episode 77/100 - Min reward: 0.0010, Max reward: 0.3387, Mean reward: 0.2227
+Episode 77/100 - Policy loss: -0.1845, Value loss: 10.0496, Entropy: 382.3248
+Episode 78/100 - Min reward: 0.0010, Max reward: 0.3638, Mean reward: 0.2431
+Episode 78/100 - Policy loss: -0.0454, Value loss: 9.2474, Entropy: 382.5541
+Episode 79/100 - Min reward: 0.0993, Max reward: 0.3597, Mean reward: 0.2692
+Episode 79/100 - Policy loss: -0.2512, Value loss: 3.1869, Entropy: 382.7685
+Episode 80/100 - Min reward: 0.1102, Max reward: 0.4007, Mean reward: 0.3016
+Episode 80/100 - Policy loss: -0.2138, Value loss: 2.0349, Entropy: 382.9515
+Episode 81/100 - Min reward: 0.0010, Max reward: 0.6797, Mean reward: 0.2534
+Episode 81/100 - Policy loss: -0.1540, Value loss: 1.9983, Entropy: 383.1810
+Episode 82/100 - Min reward: 0.0150, Max reward: 0.7677, Mean reward: 0.3881
+Episode 82/100 - Policy loss: 0.0382, Value loss: 8.2371, Entropy: 383.4623
+Episode 83/100 - Min reward: 0.0010, Max reward: 0.4846, Mean reward: 0.3475
+Episode 83/100 - Policy loss: -0.0839, Value loss: 33.1173, Entropy: 383.6766
+Episode 84/100 - Min reward: 0.0010, Max reward: 0.6918, Mean reward: 0.3579
+Episode 84/100 - Policy loss: -0.0992, Value loss: 12.6787, Entropy: 383.8076
+Episode 85/100 - Min reward: 0.0010, Max reward: 0.6136, Mean reward: 0.3837
+Episode 85/100 - Policy loss: 0.1417, Value loss: 16.2204, Entropy: 383.9813
+Episode 86/100 - Min reward: 0.0010, Max reward: 0.5007, Mean reward: 0.0975
+Episode 86/100 - Policy loss: -0.1850, Value loss: 26.6715, Entropy: 384.1547
+Episode 87/100 - Min reward: 0.0136, Max reward: 0.7860, Mean reward: 0.4571
+Episode 87/100 - Policy loss: -0.1264, Value loss: 42.7787, Entropy: 384.3103
+Episode 88/100 - Min reward: 0.0010, Max reward: 0.7311, Mean reward: 0.5366
+Episode 88/100 - Policy loss: -0.0242, Value loss: 14.2269, Entropy: 384.6306
+Episode 89/100 - Min reward: 0.0010, Max reward: 0.5418, Mean reward: 0.2225
+Episode 89/100 - Policy loss: -0.2078, Value loss: 9.1327, Entropy: 384.8838
+Episode 90/100 - Min reward: 0.0010, Max reward: 0.7002, Mean reward: 0.3282
+Episode 90/100 - Policy loss: -0.1399, Value loss: 12.5768, Entropy: 385.1179
+Episode 91/100 - Min reward: 0.0010, Max reward: 0.5578, Mean reward: 0.3332
+Episode 91/100 - Policy loss: -0.1256, Value loss: 1.6758, Entropy: 385.3419
+Episode 92/100 - Min reward: 0.0122, Max reward: 0.1964, Mean reward: 0.0923
+Episode 92/100 - Policy loss: -0.3832, Value loss: 14.0583, Entropy: 385.5765
+Episode 93/100 - Min reward: 0.1874, Max reward: 0.6834, Mean reward: 0.5000
+Episode 93/100 - Policy loss: -0.0998, Value loss: 36.1044, Entropy: 385.8126
+Episode 94/100 - Min reward: 0.0010, Max reward: 0.2272, Mean reward: 0.0148
+Episode 94/100 - Policy loss: -0.1633, Value loss: 11.3236, Entropy: 386.0814
+Episode 95/100 - Min reward: 0.0010, Max reward: 0.5331, Mean reward: 0.1385
+Episode 95/100 - Policy loss: -0.4530, Value loss: 24.3208, Entropy: 386.4544
+Episode 96/100 - Min reward: 0.0010, Max reward: 0.5316, Mean reward: 0.2734
+Episode 96/100 - Policy loss: -0.0952, Value loss: 19.7394, Entropy: 386.7639
+Episode 97/100 - Min reward: 0.1023, Max reward: 0.4315, Mean reward: 0.2005
+Episode 97/100 - Policy loss: -0.3179, Value loss: 7.2971, Entropy: 387.0318
+Episode 98/100 - Min reward: 0.0265, Max reward: 0.1120, Mean reward: 0.1060
+Episode 98/100 - Policy loss: 0.1194, Value loss: 9.4335, Entropy: 387.3268
+Episode 99/100 - Min reward: 0.0010, Max reward: 0.6086, Mean reward: 0.3221
+Episode 99/100 - Policy loss: -0.2676, Value loss: 28.7446, Entropy: 387.5830
+Episode 100/100 - Min reward: 0.0010, Max reward: 0.7806, Mean reward: 0.5470
+Episode 100/100 - Policy loss: -0.1549, Value loss: 19.1885, Entropy: 387.8383
+(Sun May-5 6:19:45pm)-(CPU 23.3%:0:Net 1)-(I have no name!:~/work)-(76K:17)
+> 
