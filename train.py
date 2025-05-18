@@ -6,10 +6,13 @@ from omegaconf import DictConfig, OmegaConf
 from renaissance.kinetics.jacobian_solver import check_jacobian
 
 from helpers.ppo_agent import PPOAgent
-from helpers.env import KineticEnv
-from helpers.utils import reward_func, load_pkl
+from helpers.env import BatchKineticEnv
+from helpers.utils import reward_func, load_pkl, batch_reward_func
+
+import numpy as np
 
 import logging
+import wandb
 
 @hydra.main(config_path="configs", config_name="train.yaml", version_base="1.1")
 def train(cfg: DictConfig):
@@ -32,22 +35,43 @@ def train(cfg: DictConfig):
 
     # Initialize environment
     names_km = load_pkl(cfg.paths.names_km)
-    reward_fn = partial(reward_func, chk_jcbn, names_km, cfg.reward.eig_partition)
-    env = KineticEnv(cfg, reward_fn)
+    reward_fn = partial(batch_reward_func, chk_jcbn, names_km, cfg.reward.eig_partition)
+    env = BatchKineticEnv(cfg, reward_fn, batch_size=cfg.training.batch_size)
     env.seed(cfg.seed)
 
     # Initialize PPO agent (actor and critic)
     ppo_agent = PPOAgent(cfg, logger)
+
+    # Optionally initialize wandb here if you want logging
+    run = wandb.init(project="rl-gen-kinetic-models", config=OmegaConf.to_container(cfg, resolve=True))
    
     # Training loop
     for episode in range(cfg.training.num_episodes):
-        trajectory = ppo_agent.collect_trajectory(env)
-        rewards = trajectory["rewards"]
+        # Collect a batch of trajectories in parallel (vectorized)
+        trajectories = ppo_agent.collect_trajectories(env, 1)  # 1 batch env, batch_size inside env
+        # Get the last step rewards for all trajectories
+        rewards = []
+        for trajectory in trajectories:
+            # Get the last step reward for each trajectory
+            rewards.append(trajectory["rewards"][-1].cpu().numpy())
+        # Convert rewards to numpy array
+        rewards = np.array(rewards)
+        # Calculate min, max, mean rewards for the last step for all trajectories
         min_rew, max_rew, mean_rew = rewards.min(), rewards.max(), rewards.mean()
         print(f"Episode {episode+1}/{cfg.training.num_episodes} - Min reward: {min_rew:.4f}, Max reward: {max_rew:.4f}, Mean reward: {mean_rew:.4f}")
-
-        policy_loss, value_loss, entropy = ppo_agent.update(trajectory)
+        policy_loss, value_loss, entropy = ppo_agent.update(trajectories)
         print(f"Episode {episode+1}/{cfg.training.num_episodes} - Policy loss: {policy_loss:.4f}, Value loss: {value_loss:.4f}, Entropy: {entropy:.4f}")
+        # Log to wandb
+        wandb.log({
+            "episode": episode + 1,
+            "min_reward": float(min_rew),
+            "max_reward": float(max_rew),
+            "mean_reward": float(mean_rew),
+            "policy_loss": float(policy_loss),
+            "value_loss": float(value_loss),
+            "entropy": float(entropy),
+        })
+    wandb.finish()
 
 
 if __name__ == "__main__":

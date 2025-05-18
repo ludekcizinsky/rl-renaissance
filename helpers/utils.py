@@ -77,6 +77,35 @@ def reward_func(chk_jcbn, names_km, eig_partition: float, gen_kinetic_params: to
     return reward
 
 
+def batch_reward_func(chk_jcbn, names_km, eig_partition: float, gen_kinetic_params: torch.Tensor, steps_ratio) -> torch.Tensor:
+    """
+    Calculate rewards for a batch of kinetic parameter tensors.
+    Args:
+        gen_kinetic_params: Tensor of shape (batch_size, param_dim)
+        steps_ratio: Ratio of the number of steps taken to the maximum number of steps
+        chk_jcbn: Jacobian solver object
+        names_km: List of parameter names
+        eig_partition: Eigenvalue partition for reward calculation
+    Returns:
+        rewards: Tensor of shape (batch_size,)
+    """
+    params_np = gen_kinetic_params.detach().cpu().numpy()
+    rewards = []
+    for param in params_np:
+        chk_jcbn._prepare_parameters([param], names_km)
+        max_eig = chk_jcbn.calc_eigenvalues_recal_vmax()[0]
+        z = np.clip(max_eig - eig_partition, -100, +100)
+
+        intermediate_reward = (1.0 / (1.0 + np.exp(z)) + 1e-3) * steps_ratio
+        penalty = max(-0.1, - 0.001 * (max_eig - eig_partition)) * steps_ratio
+
+        # Calculate the final reward
+        reward = intermediate_reward + penalty
+
+        rewards.append(reward)
+    return torch.tensor(rewards, dtype=torch.float32, device=gen_kinetic_params.device)
+
+
 def load_pkl(name: str) -> Any:
     """load a pickle object"""
     name = name.replace('.pkl', '')
