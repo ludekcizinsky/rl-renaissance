@@ -1,0 +1,58 @@
+@article {rennaissance,
+	author = {Choudhury, Subham and Narayanan, Bharath and Moret, Michael and Hatzimanikatis, Vassily and Miskovic, Ljubisa},
+	title = {Generative machine learning produces kinetic models that accurately characterize intracellular metabolic states},
+	elocation-id = {2023.02.21.529387},
+	year = {2023},
+	doi = {10.1101/2023.02.21.529387},
+	publisher = {Cold Spring Harbor Laboratory},
+	abstract = {Large omics datasets are nowadays routinely generated to provide insights into cellular processes. Nevertheless, making sense of omics data and determining intracellular metabolic states remains challenging. Kinetic models of metabolism are crucial for integrating and consolidating omics data because they explicitly link metabolite concentrations, metabolic fluxes, and enzyme levels. However, the difficulties in determining kinetic parameters that govern cellular physiology prevent the broader adoption of these models by the research community. We present RENAISSANCE (REconstruction of dyNAmIc models through Stratified Sampling using Artificial Neural networks and Concepts of Evolution strategies), a generative machine learning framework for efficiently parameterizing large-scale kinetic models with dynamic properties matching experimental observations. We showcase RENAISSANCE{\textquoteright}s capabilities through three applications: generation of kinetic models of E. coli metabolism, characterization of intracellular metabolic states, and assimilation and reconciliation of experimental kinetic data. We provide the open-access code to facilitate experimentalists and modelers applying this framework to diverse metabolic systems and integrating a broad range of available data. We anticipate that the proposed framework will be invaluable for researchers who seek to analyze metabolic variations involving changes in metabolite and enzyme levels and enzyme activity in health and biotechnological studies.Competing Interest StatementThe authors have declared no competing interest.ESEvolution StrategiesORACLEOptimization and Risk Analysis of Complex Living EntitiesGEMGEnome-scale ModelRENAISSANCEREconstruction of dyNAmIc models through Stratified Sampling using Artificial Neural networks and Concept of Evolution strategiesREKINDLEREconstruction of KINetic models of metabolism using Deep LEarningTFAThermodynamics-based Flux Balance AnalysisODEOrdinary Differential Equations},
+	URL = {https://www.biorxiv.org/content/early/2023/02/22/2023.02.21.529387},
+	eprint = {https://www.biorxiv.org/content/early/2023/02/22/2023.02.21.529387.full.pdf},
+	journal = {bioRxiv}
+}
+@article{kfit,
+title = {K-FIT: An accelerated kinetic parameterization algorithm using steady-state fluxomic data},
+journal = {Metabolic Engineering},
+volume = {61},
+pages = {197-205},
+year = {2020},
+issn = {1096-7176},
+doi = {https://doi.org/10.1016/j.ymben.2020.03.001},
+url = {https://www.sciencedirect.com/science/article/pii/S1096717620300501},
+author = {Saratram Gopalakrishnan and Satyakam Dash and Costas Maranas},
+keywords = {Kinetic models of metabolism, Parameterization, , Metabolic engineering},
+abstract = {Kinetic models predict the metabolic flows by directly linking metabolite concentrations and enzyme levels to reaction fluxes. Robust parameterization of organism-level kinetic models that faithfully reproduce the effect of different genetic or environmental perturbations remains an open challenge due to the intractability of existing algorithms. This paper introduces Kinetics-based Fluxomics Integration Tool (K-FIT), a robust kinetic parameterization workflow that leverages a novel decomposition approach to identify steady-state fluxes in response to genetic perturbations followed by a gradient-based update of kinetic parameters until predictions simultaneously agree with the fluxomic data in all perturbed metabolic networks. The applicability of K-FIT to large-scale models is demonstrated by parameterizing an expanded kinetic model for E. coli (307 reactions and 258 metabolites) using fluxomic data from six mutants. The achieved thousand-fold speed-up afforded by K-FIT over meta-heuristic approaches is transformational enabling follow-up robustness of inference analyses and optimal design of experiments to inform metabolic engineering strategies.}
+}
+@article{ischrunk,
+title = {iSCHRUNK – In Silico Approach to Characterization and Reduction of Uncertainty in the Kinetic Models of Genome-scale Metabolic Networks},
+journal = {Metabolic Engineering},
+volume = {33},
+pages = {158-168},
+year = {2016},
+issn = {1096-7176},
+doi = {https://doi.org/10.1016/j.ymben.2015.10.002},
+url = {https://www.sciencedirect.com/science/article/pii/S1096717615001299},
+author = {Stefano Andreozzi and Ljubisa Miskovic and Vassily Hatzimanikatis},
+keywords = {Large-scale kinetic models, Kinetic parameters, Enzyme saturations, Uncertainty reduction, Monte Carlo sampling, Machine learning},
+abstract = {Accurate determination of physiological states of cellular metabolism requires detailed information about metabolic fluxes, metabolite concentrations and distribution of enzyme states. Integration of fluxomics and metabolomics data, and thermodynamics-based metabolic flux analysis contribute to improved understanding of steady-state properties of metabolism. However, knowledge about kinetics and enzyme activities though essential for quantitative understanding of metabolic dynamics remains scarce and involves uncertainty. Here, we present a computational methodology that allow us to determine and quantify the kinetic parameters that correspond to a certain physiology as it is described by a given metabolic flux profile and a given metabolite concentration vector. Though we initially determine kinetic parameters that involve a high degree of uncertainty, through the use of kinetic modeling and machine learning principles we are able to obtain more accurate ranges of kinetic parameters, and hence we are able to reduce the uncertainty in the model analysis. We computed the distribution of kinetic parameters for glucose-fed E. coli producing 1,4-butanediol and we discovered that the observed physiological state corresponds to a narrow range of kinetic parameters of only a few enzymes, whereas the kinetic parameters of other enzymes can vary widely. Furthermore, this analysis suggests which are the enzymes that should be manipulated in order to engineer the reference state of the cell in a desired way. The proposed approach also sets up the foundations of a novel type of approaches for efficient, non-asymptotic, uniform sampling of solution spaces.}
+}
+@article{miskovic2019uncertainty,
+  title={Uncertainty reduction in biochemical kinetic models: Enforcing desired model properties},
+  author={Miskovic, Ljubisa and B{\'e}al, Jonas and Moret, Michael and Hatzimanikatis, Vassily},
+  journal={PLoS computational biology},
+  volume={15},
+  number={8},
+  pages={e1007242},
+  year={2019},
+  publisher={Public Library of Science San Francisco, CA USA}
+}
+@article{gans,
+  title={Reconstructing kinetic models for dynamical studies of metabolism using generative adversarial networks},
+  author={Choudhury, Subham and Moret, Michael and Salvy, Pierre and Weilandt, Daniel and Hatzimanikatis, Vassily and Miskovic, Ljubisa},
+  journal={Nature Machine Intelligence},
+  volume={4},
+  number={8},
+  pages={710--719},
+  year={2022},
+  publisher={Nature Publishing Group UK London}
+}

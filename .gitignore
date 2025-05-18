@@ -176,3 +176,15 @@ cython_debug/
 renaissance/output/
 renaissance/logs/
 renaissance/skimpy
+
+# Poster files
+*.toc
+*.snm
+*.nav
+*.out
+*.blg
+*.aux
+*.log
+*.bbl
+*.fls
+*.fdb_latexmk
