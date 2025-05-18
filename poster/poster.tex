@@ -1,0 +1,153 @@
+% Unofficial University of Cambridge Poster Template: https://github.com/andiac/gemini-cam
+% a fork of https://github.com/anishathalye/gemini
+% also refer to https://github.com/k4rtik/uchicago-poster
+
+\documentclass[final]{beamer}
+
+%\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[orientation=portrait,size=a1,scale=1.0]{beamerposter}
+\usetheme{gemini}
+\usecolortheme{nott}
+\usepackage{graphicx}
+\usepackage{anyfontsize}
+\usepackage{amssymb}
+
+\usepackage{algorithm2e}   % Only include algorithm2e
+\usepackage{setspace}      % Separately include setspace
+
+\usepackage{pifont}
+\input{packages}
+\input{macros}
+
+\DeclareMathOperator*{\argmax}{arg\,max}
+\DeclareMathOperator*{\argmin}{arg\,min}
+
+\usepackage{xcolor}
+\usepackage{etoolbox}
+
+% Ensure spacing for algorithms
+\AtBeginEnvironment{algorithm}{\setstretch{1.1}}
+
+% Layout calculations
+\newlength{\sepwidth}
+\newlength{\colwidth}
+\setlength{\sepwidth}{0.025\paperwidth}
+\setlength{\colwidth}{0.45\paperwidth}
+\newcommand{\separatorcolumn}{\begin{column}{\sepwidth}\end{column}}
+
+\setlength{\jot}{15pt}
+
+
+% ====================
+% Title etc
+% ====================
+
+\title{RL-Driven Kinetic Modeling}
+
+% \author{Milica Vukasinovic, Natasa Jovanovic, Strahinja Nikolic, Antoine Dávid, Mikulas Vanousek, Ludek Cizinsky}
+\author{M. Vukasinovic, N. Jovanovic, S. Nikolic, A. Dávid, M. Vanousek, L. Cizinsky}
+
+
+% use this to include logos on the left and/or right side of the header:
+\logoright{\includegraphics[height=7cm]{logos/epfl.png}}
+
+% ====================
+% Doc
+% ====================
+
+\begin{document}
+\begin{frame}[t]
+\begin{columns}[t]
+\separatorcolumn
+
+% ------ First column
+\begin{column}{\colwidth}
+
+    % ==== Context and Motivation
+    \begin{block}{Context and Motivation}
+    Kinetic models are essential for understanding how \textbf{cells} behave dynamically:
+    \begin{itemize}
+        \item How they respond to stress, grow, or adapt to changes?
+        % \item What happens when genes or enzymes are altered (e.g., in synthetic biology or disease)?
+        \item What happens when genes or enzymes are altered (e.g., in synthetic biology or disease)?
+    \end{itemize}
+ 
+    \vspace{0.5cm}
+
+    Applications include robustness analysis of metabolic phenotypes or bioreactor simulations (Figure \ref{fig:applications}).
+
+    % todo: we should include examples that we can explaion on a high level
+    \begin{figure}[h]
+        \centering
+        \includegraphics[width=0.5\textwidth]{assets/applications.png}
+        \caption{Showcase of usecases of kinematic models. Figure from \cite{rennaissance}.}
+        \label{fig:applications}
+    \end{figure}
+
+    However, these models require \textbf{thousands} of kinetic parameters, and most of them are \textbf{unknown}, 
+    \textbf{hard} to measure, or \textbf{inconsistent} across studies.
+    \end{block}
+
+    % ==== Previous Work
+    \begin{block}{Previous Work}
+        Traditional methods:
+        \begin{itemize}
+            \item use outdated parameters, rely on brute-force optimization, and assume simplified networks,
+            \item struggle with scalability, data uncertainty, and handling multi-scale constraints.
+        \end{itemize}
+        
+        Although attempts have been made to address these issues, they often require:
+        \begin{itemize}
+            \item \textbf{extensive} computational time \cite{kfit},
+            \item \textbf{ground truth training data} derived from traditional kinetic modeling approaches \cite{ischrunk,miskovic2019uncertainty,gans}.
+        \end{itemize}
+    Finally, newly proposed framework \textbf{RENAISSANCE} \cite{rennaissance} addresses both of these issues,
+    however, it still has the following limitations:
+    \begin{itemize}
+        \item \textbf{unstable convergence} towards finding the optimal kinetic parameters,
+        \item requires \textbf{ per environment re-training}.
+    \end{itemize}
+
+    Overview of the RENAISSANCE framework is shown in Figure \ref{fig:renaissance}.
+    \vspace{0.5cm}
+
+    \begin{figure}[h]
+        \centering
+        \includegraphics[width=1.0\textwidth]{assets/renaissance.png}
+        \caption{Overview of the RENAISSANCE framework. Figure from \cite{rennaissance}.}
+        \label{fig:renaissance}
+    \end{figure}
+
+
+    \end{block}
+
+    % ==== Key Contributions
+    \begin{block}{Key Contributions}
+        Our contributions can be summarized as follows:
+        \begin{itemize}
+            \item we propose RL based alternative to the evolutionary algorithm used in RENAISSANCE,
+            \item we provide a comparative study of the proposed RL approach vs. the traditional evolutionary algorithm,
+            % \item we demonstrate that the RL approach can lead to more stable and faster convergence,
+        \end{itemize}
+    \end{block}
+
+\end{column}
+
+% ------ Second column ------
+\separatorcolumn
+\begin{column}{\colwidth}
+
+    %\vspace{2cm}
+    
+    \begin{block}{References}
+        \nocite{*}
+        \small{\bibliographystyle{plain}\bibliography{poster}}
+    \end{block}
+
+\end{column}
+\separatorcolumn
+
+\end{columns}
+\end{frame}
+\end{document}
