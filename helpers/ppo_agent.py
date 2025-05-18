@@ -98,9 +98,9 @@ class PPOAgent:
 
                 next_state, sample_reward = env.step(action)
 
-                reward += sample_reward/self.cfg.training.n_dist_samples
                 # weight intermediete rewards less
-                reward /= (10*self.cfg.training.max_steps_per_episode)
+                # reward = sample_reward/(self.cfg.training.max_steps_per_episode)
+                reward = sample_reward
 
             buf.add(state, action, log_prob, value, reward, done)
             state = next_state

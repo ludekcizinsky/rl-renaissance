@@ -2,11 +2,11 @@ defaults:
   - default # load the default parameters
 
 name: ppo_refinement
-actor_lr: 1e-6
-critic_lr: 1e-5
+actor_lr: 1e-4
+critic_lr: 1e-3
 discount_factor: 0.99
 gae_lambda: 0.98
 clip_eps: 0.2 # clipping parameter for the surrogate objective
 value_loss_weight: 0.5 # coefficient for the value function loss
 entropy_loss_weight: 0.0 # coefficient for the entropy loss
-scale_action: 0.1
+scale_action: 1.0

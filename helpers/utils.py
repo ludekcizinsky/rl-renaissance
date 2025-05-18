@@ -71,11 +71,10 @@ def reward_func(chk_jcbn, names_km, eig_partition: float, gen_kinetic_params: to
     # TODO: this is somewhat adapted from the original Renaissance code
     # but needs further investigation
     # reward = 0.01 / (1 + np.exp(max_eig - eig_partition))
-    max_eig = np.clip(max_eig, -20, 100)
-    penalty = np.max([0, max_eig])
+    #max_eig = np.clip(max_eig, -20, 100)
+    #penalty = np.max([0, max_eig])
     z = np.clip(max_eig - eig_partition, -20, +20)
     reward = 1.0 / (1.0 + np.exp(z)) + 1e-3  # now ∈ (0,1)
-    reward = reward
 
     return reward
 
