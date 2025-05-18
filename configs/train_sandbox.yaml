@@ -14,7 +14,7 @@ logger:
 
 paths:
   names_km: data/varma_ecoli_shikki/parameter_names_km_fdp1.pkl
-  output_dir: /home/renaissance/output 
+  output_dir: /home/renaissance/renaissance/output 
   met_model_name: varma_ecoli_shikki
 
 constraints:
@@ -38,8 +38,9 @@ env:
   p_size: 10
 
 training:
-  num_episodes: 1000
+  num_episodes: 100
   max_steps_per_episode: 50
+  num_trajectories_per_episode: 16
   batch_size: 25
   num_epochs: 10
   max_grad_norm: 0.5

@@ -10,7 +10,6 @@ class KineticEnv:
         self.min_val = cfg.constraints.min_km
         self.max_val = cfg.constraints.max_km
         self.reward_fn = reward_fn
-        self.max_steps = cfg.training.max_steps_per_episode
         self.device = cfg.device
 
         self._reset_generator = torch.Generator(device=self.device)
@@ -49,11 +48,7 @@ class KineticEnv:
         r = self.reward_fn(self.state)
         reward = float(r) if isinstance(r, torch.Tensor) else r
 
-        # increment and check termination
-        self.step_count += 1
-        done = (self.step_count >= self.max_steps)
-
-        return self.state.clone(), reward, done
+        return self.state.clone(), reward
 
     def render(self):
         """Print current state of parameters."""

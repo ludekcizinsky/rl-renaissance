@@ -8,6 +8,7 @@ from renaissance.kinetics.jacobian_solver import check_jacobian
 from helpers.ppo_agent import PPOAgent
 from helpers.env import KineticEnv
 from helpers.utils import reward_func, load_pkl
+import torch
 
 import logging
 
@@ -41,12 +42,31 @@ def train(cfg: DictConfig):
    
     # Training loop
     for episode in range(cfg.training.num_episodes):
-        trajectory = ppo_agent.collect_trajectory(env)
-        rewards = trajectory["rewards"]
-        min_rew, max_rew, mean_rew = rewards.min(), rewards.max(), rewards.mean()
+        # Collect multiple trajectories per episode
+        trajectories = []
+        for _ in range(cfg.training.num_trajectories_per_episode):
+            trajectory = ppo_agent.collect_trajectory(env)
+            trajectories.append(trajectory)
+        
+        # Combine all trajectories
+        combined_trajectory = {
+            "states": torch.cat([t["states"] for t in trajectories]),
+            "actions": torch.cat([t["actions"] for t in trajectories]),
+            "log_probs": torch.cat([t["log_probs"] for t in trajectories]),
+            "values": torch.cat([t["values"] for t in trajectories]),
+            "rewards": torch.cat([t["rewards"] for t in trajectories]),
+            "dones": torch.cat([t["dones"] for t in trajectories]),
+        }
+        
+        # Calculate combined rewards statistics
+        rewards = combined_trajectory["rewards"]
+        min_rew = rewards.min().item()
+        max_rew = rewards.max().item()
+        mean_rew = rewards.mean().item()
         print(f"Episode {episode+1}/{cfg.training.num_episodes} - Min reward: {min_rew:.4f}, Max reward: {max_rew:.4f}, Mean reward: {mean_rew:.4f}")
 
-        policy_loss, value_loss, entropy = ppo_agent.update(trajectory)
+        # Update agent with combined trajectory
+        policy_loss, value_loss, entropy = ppo_agent.update(combined_trajectory)
         print(f"Episode {episode+1}/{cfg.training.num_episodes} - Policy loss: {policy_loss:.4f}, Value loss: {value_loss:.4f}, Entropy: {entropy:.4f}")
 
 

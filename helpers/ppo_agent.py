@@ -27,6 +27,7 @@ class PolicyNetwork(nn.Module):
         self.log_std = nn.Parameter(torch.full((cfg.env.p_size,), -0.5))
 
     def bound_action(self, action):
+        action *= self.cfg.method.scale_action
         action = torch.clamp(action, self.cfg.constraints.min_km, self.cfg.constraints.max_km)
         return action
 
@@ -75,19 +76,34 @@ class PPOAgent:
         buf = TrajectoryBuffer()
 
         state = env.reset()
-        for _ in range(self.cfg.training.max_steps_per_episode):
+        done = False
+        for t in range(self.cfg.training.max_steps_per_episode):
             mean, std = self.policy_net(state)
             dist = torch.distributions.Normal(mean, std)
-            action = dist.rsample()
-            log_prob = dist.log_prob(action).sum()
-            value = self.value_net(state)
+            reward = 0
+            if t == self.cfg.training.max_steps_per_episode - 1:
+                for _ in range(self.cfg.training.n_dist_samples):
+                    action = dist.rsample()
+                    log_prob = dist.log_prob(action).sum()
+                    value = self.value_net(state)
 
-            next_state, reward, done = env.step(action)
+                    next_state, sample_reward = env.step(action)
+
+                    reward += sample_reward/self.cfg.training.n_dist_samples
+                    done = True
+            else:
+                action = dist.rsample()
+                log_prob = dist.log_prob(action).sum()
+                value = self.value_net(state)
+
+                next_state, sample_reward = env.step(action)
+
+                reward += sample_reward/self.cfg.training.n_dist_samples
+                # weight intermediete rewards less
+                reward /= (10*self.cfg.training.max_steps_per_episode)
 
             buf.add(state, action, log_prob, value, reward, done)
             state = next_state
-            if done:
-                break
 
         trajectory = buf.to_tensors()
         buf.clear()
