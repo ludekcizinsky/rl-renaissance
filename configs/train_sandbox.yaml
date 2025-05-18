@@ -1,0 +1,53 @@
+defaults:
+  - method: sandbox.yaml
+  - _self_
+
+seed: 42
+device: cpu
+
+# for now ignore, we don't use wandb yet
+logger:
+  project: rl-renaissance
+  entity: ludekcizinsky
+  tags: [dev]
+
+
+paths:
+  names_km: data/varma_ecoli_shikki/parameter_names_km_fdp1.pkl
+  output_dir: /home/renaissance/output 
+  met_model_name: varma_ecoli_shikki
+
+constraints:
+  # minimum value of generated Kms = exp(-25)
+  min_km: -25 
+  # maximum value of generated Kms = exp(3)
+  max_km: 3
+
+  # index of the steady state to generate kinetic models around (there are 5000 steady states in the data provided)
+  ss_idx: 1712
+
+reward:
+  # eigenvalue partition between valid and invalid models
+  eig_partition: -2.5
+
+env:
+  # Initial mean and std the normal distribution for p0
+  p0_init_mean: 0
+  p0_init_std: 0.1
+  # Total number of kinetic parameters
+  p_size: 10
+
+training:
+  num_episodes: 1000
+  max_steps_per_episode: 50
+  batch_size: 25
+  num_epochs: 10
+  max_grad_norm: 0.5
+
+
+# Just to let Hydra know where to save the config file
+hydra:
+  run:
+    dir: ${paths.output_dir}/${now:%Y-%m-%d}_${now:%H-%M-%S}
+  job:
+    chdir: False

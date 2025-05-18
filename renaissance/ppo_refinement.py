@@ -1,10 +1,11 @@
-import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.distributions import Normal
 import numpy as np
 
+# Assuming Actor and Critic classes are defined elsewhere and are compatible.
+# Placeholder Actor and Critic for the code to be runnable for demonstration
 class Actor(nn.Module):
     def __init__(self, state_dim, action_dim, hidden_dim):
         super(Actor, self).__init__()
@@ -40,7 +41,7 @@ class PPORefinement:
                  actor_lr=3e-4, critic_lr=1e-3,
                  gamma=0.99, ppo_epochs=4, epsilon=0.2,
                  gae_lambda=0.95, T_horizon=20,
-                 n_trajectories=32, n_samples=10,
+                 n_trajectories=32,
                  device=None):
 
         self.param_dim = param_dim
@@ -49,7 +50,6 @@ class PPORefinement:
         self.reward_function = reward_function
         self.max_grad_norm = 0.5
         self.n_trajectories = n_trajectories
-        self.n_samples=n_samples
 
         if device is None:
             self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -75,7 +75,6 @@ class PPORefinement:
         self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=critic_lr)
 
         self.mse_loss = nn.MSELoss()
-        self.rand_state = torch.rand(self.param_dim, device=self.device) * (self.max_x_bounds - self.min_x_bounds) + self.min_x_bounds
 
     def _transform_to_bounded(self, params_raw):
         tanh_params = torch.tanh(params_raw)
@@ -85,15 +84,13 @@ class PPORefinement:
         current_params_in_state = torch.rand(self.param_dim, device=self.device) * (self.max_x_bounds - self.min_x_bounds) + self.min_x_bounds
         return current_params_in_state
 
-    def _colect_average_reward(self):
-        pass
-
     def collect_rollout_data(self):
         states, actions_raw, log_probs_raw, rewards, dones, values = [], [], [], [], [], []
-
         current_params_in_state = self._initialize_current_params_for_state().clone()
-        noise = torch.randn(self.noise_dim, device=self.device)
+        final_ode_params = None
+
         for t in range(self.T_horizon):
+            noise = torch.randn(self.noise_dim, device=self.device)
             state_1d = torch.cat((noise, current_params_in_state.detach()), dim=0)
             state_batch = state_1d.unsqueeze(0)
 
@@ -108,15 +105,13 @@ class PPORefinement:
             ode_params = self._transform_to_bounded(action_raw)
 
             if t == self.T_horizon - 1:
-                action_samples = dist.sample((self.n_samples,))
-                bounded_params = self._transform_to_bounded(action_samples)
-                r = np.mean([self.reward_function(params.squeeze()) for params in bounded_params])
                 r = self.reward_function(ode_params.squeeze(0))
                 d = True
+                final_ode_params = ode_params.squeeze(0).detach()
             else:
                 r = 0.0
                 d = False
-        
+
             states.append(state_1d)
             actions_raw.append(action_raw.squeeze(0))
             log_probs_raw.append(action_log_prob_raw.squeeze(0))
@@ -137,7 +132,7 @@ class PPORefinement:
             torch.stack(dones),
             torch.stack(values)
         )
-        return rollout_data
+        return rollout_data, final_ode_params
 
     def update_policy(self, rollout_data):
         states, actions_raw, old_log_probs_raw, rewards, dones, old_values = rollout_data
@@ -147,6 +142,7 @@ class PPORefinement:
         returns = torch.zeros_like(rewards, device=self.device)
         gae = 0
         next_val = torch.tensor(0.0, device=self.device)
+
         for t in reversed(range(len(rewards))):
             delta = rewards[t] + self.gamma * next_val * (1.0 - dones[t].float()) - old_values[t]
             gae = delta + self.gamma * self.gae_lambda * (1.0 - dones[t].float()) * gae
@@ -156,8 +152,6 @@ class PPORefinement:
 
         advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
-        critic_losses = []
-        actor_losses = []
         for _ in range(self.ppo_epochs):
             mu_raw, log_std_raw = self.actor(states)
             std_raw = torch.exp(log_std_raw)
@@ -182,61 +176,23 @@ class PPORefinement:
             torch.nn.utils.clip_grad_norm_(self.critic.parameters(), self.max_grad_norm)
             self.critic_optimizer.step()
 
-            critic_losses.append(critic_loss.item())
-            actor_losses.append(actor_loss.item())
-
-        return np.mean(actor_losses), np.mean(critic_losses)
-
-    def train(self, num_training_iterations, output_path=None, actor_path=None, critic_path=None):
-        """
-        Trains the PPO agent.
-
-        Args:
-            num_training_iterations (int): The total number of training iterations.
-            output_path (str, optional): Directory to save model checkpoints and rewards. Defaults to None.
-            actor_path (str, optional): Path to a pretrained actor state_dict. Defaults to None.
-            critic_path (str, optional): Path to a pretrained critic state_dict. Defaults to None.
-        """
+    def train(self, num_training_iterations, output_path=None):
         print(f"Training on {self.device}. {self.n_trajectories} trajectories per update.")
-
-        # Load pretrained models if paths are provided
-        if actor_path:
-            try:
-                self.actor.load_state_dict(torch.load(actor_path, map_location=self.device))
-                print(f"Loaded pretrained actor from {actor_path}")
-            except FileNotFoundError:
-                print(f"Warning: Actor file not found at {actor_path}. Starting training with randomly initialized actor.")
-            except Exception as e:
-                print(f"Error loading actor state_dict: {e}. Starting training with randomly initialized actor.")
-
-        if critic_path:
-            try:
-                self.critic.load_state_dict(torch.load(critic_path, map_location=self.device))
-                print(f"Loaded pretrained critic from {critic_path}")
-            except FileNotFoundError:
-                print(f"Warning: Critic file not found at {critic_path}. Starting training with randomly initialized critic.")
-            except Exception as e:
-                print(f"Error loading critic state_dict: {e}. Starting training with randomly initialized critic.")
-
         # Stores the average final reward of the batch of trajectories for each training iteration
         avg_final_rewards_per_iteration = []
-
-        # Ensure output directory exists if saving is enabled
-        if output_path:
-            os.makedirs(output_path, exist_ok=True)
 
         for iteration in range(num_training_iterations):
             # Lists to store data from multiple trajectories for the current update iteration
             batch_states_list, batch_actions_raw_list, batch_log_probs_raw_list = [], [], []
             batch_rewards_list, batch_dones_list, batch_values_list = [], [], []
-
+            
             # Store final rewards from each trajectory in this batch for averaging
             current_batch_final_rewards = []
 
             for _ in range(self.n_trajectories):
                 # collect_rollout_data collects one trajectory
                 (states, actions_raw, log_probs_raw,
-                 rewards, dones, values) = self.collect_rollout_data()
+                 rewards, dones, values), final_ode_params = self.collect_rollout_data()
 
                 batch_states_list.append(states)
                 batch_actions_raw_list.append(actions_raw)
@@ -244,12 +200,17 @@ class PPORefinement:
                 batch_rewards_list.append(rewards)
                 batch_dones_list.append(dones)
                 batch_values_list.append(values)
-                current_batch_final_rewards.append(rewards[-1])
 
+                if final_ode_params is not None:
+                    # Calculate reward for this specific trajectory's final params
+                    # .item() is used to get a Python number for aggregation
+                    reward_val = self.reward_function(final_ode_params).item() 
+                    current_batch_final_rewards.append(reward_val)
+            
             if not batch_states_list: # Should only happen if self.n_trajectories is 0 or less
                 print(f"Warning: No rollout data collected in iteration {iteration+1}. Skipping update.")
                 continue
-
+                
             # Concatenate all collected data to form a single large batch
             # Each tensor from collect_rollout_data has shape (T_horizon, ...),
             # so concatenating along dim=0 results in (self.n_trajectories * T_horizon, ...)
@@ -265,35 +226,23 @@ class PPORefinement:
                 batched_rewards, batched_dones, batched_values
             )
 
-            avg_actor_loss, avg_critic_loss = self.update_policy(batched_rollout_data_tuple)
+            self.update_policy(batched_rollout_data_tuple)
 
             if current_batch_final_rewards:
                 avg_final_reward_for_batch = sum(current_batch_final_rewards) / len(current_batch_final_rewards)
                 avg_final_rewards_per_iteration.append(avg_final_reward_for_batch)
                 # Log every iteration (or adjust frequency as needed)
-                if (iteration + 1) % 1 == 0:
+                if (iteration + 1) % 1 == 0: 
                     print(f"Iteration {iteration+1}/{num_training_iterations}, Avg Batch Final Reward: {avg_final_reward_for_batch:.4f}")
-                    print(f"Avg actor loss {avg_actor_loss:.4f} Avg critic loss {avg_critic_loss:.4f}")
-
-            # Save models and rewards periodically
-            if output_path:
-                if (iteration + 1) % 100 == 0:
-                    torch.save(self.actor.state_dict(), os.path.join(output_path, f"actor_{iteration+1}.pth"))
-                    torch.save(self.critic.state_dict(), os.path.join(output_path, f"critic_{iteration+1}.pth"))
-                    print(f"Model saved at iteration {iteration+1}")
-                # Save rewards after each iteration
-                np.save(os.path.join(output_path, "avg_final_rewards_per_iteration.npy"), np.array(avg_final_rewards_per_iteration))
-
+            
+            if output_path and (iteration + 1) % 100 == 0:
+                torch.save(self.actor.state_dict(), output_path + f"actor_{iteration+1}.pth")
+                torch.save(self.critic.state_dict(), output_path + f"critic_{iteration+1}.pth")
+                print(f"Model saved at iteration {iteration+1}")
 
         if output_path:
-            # Save final models after training finishes
-            torch.save(self.actor.state_dict(), os.path.join(output_path, "actor_final.pth"))
-            torch.save(self.critic.state_dict(), os.path.join(output_path, "critic_final.pth"))
-            print(f"Final models saved to {output_path}")
-            # Save final rewards array
-            np.save(os.path.join(output_path, "avg_final_rewards_per_iteration.npy"), np.array(avg_final_rewards_per_iteration))
-            print(f"Average final rewards per iteration saved at {os.path.join(output_path, 'avg_final_rewards_per_iteration.npy')}")
-
+            np.save(output_path + "avg_final_rewards_per_iteration.npy", np.array(avg_final_rewards_per_iteration))
+            print(f"Average final rewards per iteration saved at {output_path}avg_final_rewards_per_iteration.npy")
 
         print("Training finished.")
         return self.actor, avg_final_rewards_per_iteration
