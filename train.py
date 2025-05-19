@@ -4,7 +4,7 @@ from functools import partial
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
-from renaissance.kinetics.jacobian_solver import check_jacobian
+from helpers.jacobian_solver import check_jacobian
 
 from helpers.ppo_agent import PPOAgent
 from helpers.env import KineticEnv
