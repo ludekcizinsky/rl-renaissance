@@ -10,6 +10,8 @@ from helpers.env import KineticEnv
 from helpers.utils import reward_func, load_pkl
 
 import logging
+import numpy as np
+import os
 
 @hydra.main(config_path="configs", config_name="train.yaml", version_base="1.1")
 def train(cfg: DictConfig):
@@ -39,10 +41,15 @@ def train(cfg: DictConfig):
     # Initialize PPO agent (actor and critic)
     ppo_agent = PPOAgent(cfg, logger)
 
-    best_last_reward = float('-inf')
-    best_actor_path = f"{cfg.paths.output_dir}/best_actor.pth"
-    best_critic_path = f"{cfg.paths.output_dir}/best_critic.pth"
-   
+    best_reward = float('-inf')
+    best_actor_path = f"{cfg.paths.output_dir}/run_0/best_actor.pth"
+    best_critic_path = f"{cfg.paths.output_dir}/run_0/best_critic.pth"
+    import os
+    save_dir = os.path.join(cfg.paths.output_dir, "run_0")
+    os.makedirs(save_dir, exist_ok=True)
+    collect_rewards = []
+    collect_policy_loss = []
+    collect_value_loss = []
     # Training loop
     for episode in range(cfg.training.num_episodes):
         trajectory = ppo_agent.collect_trajectory(env)
@@ -54,14 +61,32 @@ def train(cfg: DictConfig):
         policy_loss, value_loss, entropy = ppo_agent.update(trajectory)
         print(f"Episode {episode+1}/{cfg.training.num_episodes} - Policy loss: {policy_loss:.4f}, Value loss: {value_loss:.4f}, Entropy: {entropy:.4f}")
 
-        if last_reward > best_last_reward:
-            best_last_reward = last_reward
+        if last_reward > best_reward:
+            best_reward = last_reward
             import os, torch
             os.makedirs(cfg.paths.output_dir, exist_ok=True)
             torch.save(ppo_agent.policy_net.state_dict(), best_actor_path)
             torch.save(ppo_agent.value_net.state_dict(), best_critic_path)
-            print(f"Best model saved at episode {episode+1} with mean reward {best_last_reward:.4f}")
+            print(f"Best model saved at episode {episode+1} with mean reward {best_reward:.4f}")
+            # Save the training data
+            np.save(os.path.join(save_dir, "rewards.npy"), np.array(collect_rewards))
+            np.save(os.path.join(save_dir, "policy_loss.npy"), np.array(collect_policy_loss))
+            np.save(os.path.join(save_dir, "value_loss.npy"), np.array(collect_value_loss))
+        collect_rewards.append(rewards.numpy())
+        collect_policy_loss.append(policy_loss)
+        collect_value_loss.append(value_loss)
+
+    # Save the training data
+    np.save(os.path.join(save_dir, "rewards.npy"), np.array(collect_rewards))
+    np.save(os.path.join(save_dir, "policy_loss.npy"), np.array(collect_policy_loss))
+    np.save(os.path.join(save_dir, "value_loss.npy"), np.array(collect_value_loss))
+    # save the config file
+    with open(os.path.join(save_dir, "config.yaml"), "w") as f:
+        f.write(OmegaConf.to_yaml(cfg))
+
 
 
 if __name__ == "__main__":
     train()
+
+
