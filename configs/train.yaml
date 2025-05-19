@@ -45,6 +45,7 @@ training:
   batch_size: 25
   num_epochs: 10
   max_grad_norm: 0.5
+  save_trained_models: true
 
 
 # Just to let Hydra know where to save the config file

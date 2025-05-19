@@ -1,3 +1,4 @@
+import os
 import pickle
 from typing import Any
 
@@ -144,3 +145,45 @@ def log_max_eig_dist_and_incidence_rate(max_eig_values, was_valid_solution, epis
         "episode": episode
     })
     plt.close(fig)
+
+
+def log_rl_models(
+    policy_net: torch.nn.Module,
+    value_net:  torch.nn.Module,
+    description:   str = "Trained policy and value networks",
+    save_dir:      str = ".",
+):
+    """
+    Logs policy and value networks to W&B as a versioned Artifact.
+
+    Args:
+        policy_net:     Trained policy network (torch.nn.Module).
+        value_net:      Trained value network (torch.nn.Module).
+        description:    Artifact description.
+        save_dir:       Directory where to save temporary .pt files.
+    """
+
+
+    # Prepare file paths
+    run_name = wandb.run.name
+    save_dir = os.path.join(save_dir, run_name)
+    os.makedirs(save_dir, exist_ok=True)
+    policy_path = os.path.join(save_dir, "policy.pt")
+    value_path  = os.path.join(save_dir, "value.pt")
+
+    # Save state_dicts
+    torch.save(policy_net.state_dict(), policy_path)
+    torch.save(value_net.state_dict(),  value_path)
+
+    # Build and log the Artifact
+    artifact = wandb.Artifact(
+        name=run_name,
+        type="model",
+        description=description
+    )
+    artifact.add_file(policy_path)
+    artifact.add_file(value_path)
+    wandb.log_artifact(artifact)
+    wandb.log_artifact(artifact, aliases=["latest"])
+
+    print(f"FYI: Logged model to W&B as {run_name}.")

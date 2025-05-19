@@ -8,7 +8,7 @@ from helpers.jacobian_solver import check_jacobian
 
 from helpers.ppo_agent import PPOAgent
 from helpers.env import KineticEnv
-from helpers.utils import reward_func, load_pkl
+from helpers.utils import reward_func, load_pkl, log_rl_models
 from helpers.logger import get_wandb_run
 
 import logging
@@ -52,6 +52,10 @@ def train(cfg: DictConfig):
 
         # Update PPO agent
         ppo_agent.update(trajectory)
+
+    # Log models
+    if cfg.training.save_trained_models:
+        log_rl_models(ppo_agent.policy_net, ppo_agent.value_net, save_dir=cfg.paths.output_dir)
 
 if __name__ == "__main__":
     train()
