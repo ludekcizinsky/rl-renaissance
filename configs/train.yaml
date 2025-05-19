@@ -29,6 +29,7 @@ constraints:
 reward:
   # eigenvalue partition between valid and invalid models
   eig_partition: -2.5
+  include_penalty: False
 
 env:
   # Initial mean and std the normal distribution for p0

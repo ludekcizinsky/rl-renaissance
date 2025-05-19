@@ -189,3 +189,4 @@ renaissance/skimpy
 *.fls
 *.fdb_latexmk
 *.pth
+*.npy

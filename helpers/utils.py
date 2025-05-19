@@ -53,7 +53,7 @@ def get_initial_state(cfg: DictConfig) -> torch.Tensor:
     return p_curr
 
 
-def reward_func(chk_jcbn, names_km, eig_partition: float, gen_kinetic_params: torch.Tensor) -> float:
+def reward_func(chk_jcbn, names_km, eig_partition: float, include_penalty:bool, gen_kinetic_params: torch.Tensor) -> float:
     """
     Calculate the reward for a 1D tensor of kinetic parameters.
     """
@@ -71,10 +71,15 @@ def reward_func(chk_jcbn, names_km, eig_partition: float, gen_kinetic_params: to
     # TODO: this is somewhat adapted from the original Renaissance code
     # but needs further investigation
     # reward = 0.01 / (1 + np.exp(max_eig - eig_partition))
-    #max_eig = np.clip(max_eig, -20, 100)
+    #eig_values = np.clip(eig_values, -20, 100)
     #penalty = np.max([0, max_eig])
+    #considered_avg = sum(eig_values[:10]) / 10
+    #reward = np.exp(-0.1 * considered_avg) / 2
     z = np.clip(max_eig - eig_partition, -20, +20)
+    penalty = np.clip(max_eig, 0, 100)
     reward = 1.0 / (1.0 + np.exp(z)) + 1e-3  # now ∈ (0,1)
+    if include_penalty:
+        reward -= penalty
 
     return reward
 
