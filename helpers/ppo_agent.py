@@ -216,22 +216,28 @@ class PPOAgent:
                 ratio = torch.exp(new_logp - b_oldlp)
                 surr1 = ratio * b_advs
                 surr2 = torch.clamp(ratio, 1.0 - self.cfg.method.clip_eps, 1.0 + self.cfg.method.clip_eps) * b_advs
+                step_log_info["ppo/advs"] = b_advs.mean().item()
+                step_log_info["ppo/per_dim_ratio"] = torch.exp((new_logp - b_oldlp) / self.cfg.env.p_size).mean().item()
+                step_log_info["ppo/surr1"] = surr1.mean().item()
+                step_log_info["ppo/surr2"] = surr2.mean().item()
+
+                # policy loss
                 policy_loss = -torch.min(surr1, surr2).mean()
+                step_log_info["ppo/policy_loss"] = policy_loss.item()
 
                 # value loss
                 new_values = self.value_net(b_states).squeeze(-1)
                 value_loss = (b_returns - new_values).pow(2).mean()
+                step_log_info["ppo/value_loss"] = value_loss.item()
+
+                # penalty for log std
+                pnet_log_std_penalty = 1e-3 * (self.policy_net.log_std**2).sum()
+                step_log_info["ppo/pnet_log_std_penalty"] = pnet_log_std_penalty.item()
 
                 # combined loss
-                pnet_log_std_penalty = 1e-3 * (self.policy_net.log_std**2).sum()
                 loss = policy_loss \
                      + self.cfg.method.value_loss_weight * value_loss \
                      + pnet_log_std_penalty
-                
-                step_log_info["ppo/policy_loss"] = policy_loss.item()
-                step_log_info["ppo/value_loss"] = value_loss.item()
-                step_log_info["ppo/weighted_value_loss"] = self.cfg.method.value_loss_weight * value_loss.item()
-                step_log_info["ppo/pnet_log_std_penalty"] = pnet_log_std_penalty.item()
                 step_log_info["ppo/loss"] = loss.item()
 
                 # optimize
