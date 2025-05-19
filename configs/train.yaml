@@ -1,15 +1,17 @@
 defaults:
   - method: refinement_ppo
+  - lr_scheduler: cosine
   - _self_
 
 seed: 42
-device: cpu
+device: cuda
+launch_cmd: null # will be set at runtime dynamically
 
 # for now ignore, we don't use wandb yet
 logger:
   project: rl-renaissance
   entity: ludekcizinsky
-  tags: [dev]
+  tags: [baseline]
 
 
 paths:
@@ -43,6 +45,7 @@ training:
   batch_size: 25
   num_epochs: 10
   max_grad_norm: 0.5
+  save_trained_models: true
 
 
 # Just to let Hydra know where to save the config file

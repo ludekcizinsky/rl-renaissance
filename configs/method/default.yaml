@@ -1,5 +1,5 @@
 parameter_dim: 384
-latent_dim: 99
+latent_dim: 64
 
 
 

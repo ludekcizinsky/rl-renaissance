@@ -1,5 +1,6 @@
 import torch
-
+import wandb
+import numpy as np
 class KineticEnv:
     def __init__(self, cfg, reward_fn):
         """
@@ -11,13 +12,17 @@ class KineticEnv:
         self.max_val = cfg.constraints.max_km
         self.reward_fn = reward_fn
         self.max_steps = cfg.training.max_steps_per_episode
-        self.device = cfg.device
+        self.eig_cutoff = cfg.reward.eig_partition
+        self.device = torch.device("cpu")
 
-        self._reset_generator = torch.Generator(device=self.device)
+        self._reset_generator = torch.Generator()
         self._reset_generator.manual_seed(cfg.seed)
 
         self.state = None
         self.step_count = 0
+        self.env_step = 0
+        self.max_eig_values = []
+        self.was_valid_solution = []
 
     def reset(self) -> torch.Tensor:
         """Sample the same deterministic initial params on every reset."""
@@ -28,6 +33,9 @@ class KineticEnv:
             generator=self._reset_generator,
             device=self.device
         ) * (self.max_val - self.min_val) + self.min_val
+
+        self.max_eig_values = []
+        self.was_valid_solution = []
         return self.state.clone()
 
     def step(self, action: torch.Tensor):
@@ -46,11 +54,21 @@ class KineticEnv:
         )
 
         # compute black-box reward
-        r = self.reward_fn(self.state)
+        r, all_eigenvalues = self.reward_fn(self.state)
         reward = float(r) if isinstance(r, torch.Tensor) else r
+        max_eig_value = np.max(all_eigenvalues)
+        self.max_eig_values.append(max_eig_value)
+        self.was_valid_solution.append(max_eig_value < self.eig_cutoff)
+        wandb.log({
+            "episode/max_eigenvalue": max_eig_value, 
+            "episode/was_valid_solution": int(self.was_valid_solution[-1]), 
+            "env_step": self.env_step,
+        })
+
 
         # increment and check termination
         self.step_count += 1
+        self.env_step += 1
         done = (self.step_count >= self.max_steps)
 
         return self.state.clone(), reward, done

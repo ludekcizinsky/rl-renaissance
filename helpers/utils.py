@@ -1,3 +1,4 @@
+import os
 import pickle
 from typing import Any
 
@@ -5,6 +6,9 @@ import torch
 import math
 import numpy as np
 from omegaconf import DictConfig
+import matplotlib.pyplot as plt
+from scipy.stats import gaussian_kde
+import wandb
 
 def get_timestep_embedding(timestep: int, embedding_dim: int, max_period: float = 10000) -> torch.Tensor:
     """
@@ -53,7 +57,7 @@ def get_initial_state(cfg: DictConfig) -> torch.Tensor:
     return p_curr
 
 
-def reward_func(chk_jcbn, names_km, eig_partition: float, gen_kinetic_params: torch.Tensor) -> float:
+def reward_func(chk_jcbn, names_km, eig_partition: float, gen_kinetic_params: torch.Tensor):
     """
     Calculate the reward for a 1D tensor of kinetic parameters.
     """
@@ -65,7 +69,8 @@ def reward_func(chk_jcbn, names_km, eig_partition: float, gen_kinetic_params: to
     chk_jcbn._prepare_parameters([gen_kinetic_params], names_km)
 
     # Calculate the maximum eigenvalue of the Jacobian
-    max_eig = chk_jcbn.calc_eigenvalues_recal_vmax()[0]
+    all_eigenvalues = chk_jcbn.calc_eigenvalues_recal_vmax()[0]
+    max_eig = np.max(all_eigenvalues)
 
     # Calculate the reward
     # TODO: this is somewhat adapted from the original Renaissance code
@@ -74,11 +79,137 @@ def reward_func(chk_jcbn, names_km, eig_partition: float, gen_kinetic_params: to
     z = np.clip(max_eig - eig_partition, -20, +20)
     reward = 1.0 / (1.0 + np.exp(z)) + 1e-3  # now ∈ (0,1)
 
-    return reward
+    return reward, all_eigenvalues
 
 
-def load_pkl(name: str) -> Any:
-    """load a pickle object"""
-    name = name.replace('.pkl', '')
-    with open(name + '.pkl', 'rb') as f:
+def load_pkl(path: str) -> Any:
+    with open(path, 'rb') as f:
         return pickle.load(f)
+
+
+def save_pkl(path: str, obj: Any):
+    with open(path, 'wb') as f:
+        pickle.dump(obj, f)
+
+
+def compute_grad_norm(model, norm_type: float = 2.0) -> float:
+    """
+    Compute the total gradient norm over all model parameters.
+    
+    Args:
+        model (torch.nn.Module): your model
+        norm_type (float): the p‐norm to use (default: 2)
+    
+    Returns:
+        float: the total norm (as a Python float)
+    """
+    total_norm = 0.0
+    for p in model.parameters():
+        if p.grad is not None:
+            param_norm = p.grad.data.norm(norm_type)
+            total_norm += param_norm.item() ** norm_type
+    total_norm = total_norm ** (1.0 / norm_type)
+    return total_norm
+
+
+def log_max_eig_dist_and_incidence_rate(max_eig_values, was_valid_solution, episode: int):
+
+
+    data = np.asarray(max_eig_values)
+
+    # 1) Set up figure & axis
+    fig, ax = plt.subplots(figsize=(9, 6), dpi=100)
+
+    # 2) Fit KDE
+    kde = gaussian_kde(data, bw_method=0.2)
+
+    # 3) Build evaluation grid
+    x_min, x_max = data.min() - 1, data.max() + 1
+    x = np.linspace(x_min, x_max, 500)
+    y = kde(x)
+
+    # 4) Plot
+    ax.plot(x, y, lw=2)
+    ax.fill_between(x, y, alpha=0.3)
+    ax.set_xlabel("max eigenvalue")
+    ax.set_ylabel("density")
+    ax.set_title("Smoothed density of max eigenvalue")
+    fig.tight_layout()
+
+
+    incidence_rate = sum(was_valid_solution) / len(was_valid_solution)
+
+    wandb.log({
+        "reward/max_eig_dist": wandb.Image(fig), 
+        "reward/incidence_rate": incidence_rate,
+        "episode": episode
+    })
+    plt.close(fig)
+
+
+def log_reward_distribution(rewards, episode: int):
+
+    data = np.asarray(rewards)
+
+    fig, ax = plt.subplots(figsize=(9, 6), dpi=100)
+
+    kde = gaussian_kde(data, bw_method=0.2)
+
+    x_min, x_max = data.min() - 1, data.max() + 1
+    x = np.linspace(x_min, x_max, 500)
+    y = kde(x)
+
+    ax.plot(x, y, lw=2)
+    ax.fill_between(x, y, alpha=0.3)
+    ax.set_xlabel("reward")
+    ax.set_ylabel("density")
+    ax.set_title("Smoothed density of reward")
+    fig.tight_layout()
+
+    wandb.log({
+        "reward/distribution": wandb.Image(fig), 
+        "episode": episode
+    })
+    plt.close(fig)
+
+
+def log_rl_models(
+    policy_net: torch.nn.Module,
+    value_net:  torch.nn.Module,
+    description:   str = "Trained policy and value networks",
+    save_dir:      str = ".",
+):
+    """
+    Logs policy and value networks to W&B as a versioned Artifact.
+
+    Args:
+        policy_net:     Trained policy network (torch.nn.Module).
+        value_net:      Trained value network (torch.nn.Module).
+        description:    Artifact description.
+        save_dir:       Directory where to save temporary .pt files.
+    """
+
+
+    # Prepare file paths
+    run_name = wandb.run.name
+    save_dir = os.path.join(save_dir, run_name)
+    os.makedirs(save_dir, exist_ok=True)
+    policy_path = os.path.join(save_dir, "policy.pt")
+    value_path  = os.path.join(save_dir, "value.pt")
+
+    # Save state_dicts
+    torch.save(policy_net.state_dict(), policy_path)
+    torch.save(value_net.state_dict(),  value_path)
+
+    # Build and log the Artifact
+    artifact = wandb.Artifact(
+        name=run_name,
+        type="model",
+        description=description
+    )
+    artifact.add_file(policy_path)
+    artifact.add_file(value_path)
+    wandb.log_artifact(artifact)
+    wandb.log_artifact(artifact, aliases=["latest"])
+
+    print(f"FYI: Logged model to W&B as {run_name}.")
