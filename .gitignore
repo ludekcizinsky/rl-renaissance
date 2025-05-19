@@ -188,3 +188,5 @@ renaissance/skimpy
 *.bbl
 *.fls
 *.fdb_latexmk
+*.pth
+*.npy
