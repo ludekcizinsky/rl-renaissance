@@ -27,7 +27,6 @@ constraints:
 reward:
   eig_partition: -2.5
   intermediate_steps_weight: 1.0
-  n_samples: 1
 env:
   p0_init_mean: 0
   p0_init_std: 1

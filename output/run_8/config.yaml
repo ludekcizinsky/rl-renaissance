@@ -34,7 +34,7 @@ env:
   action_scale: 1.0
 training:
   num_episodes: 100
-  max_steps_per_episode: 20
+  max_steps_per_episode: 50
   batch_size: 25
   num_epochs: 10
   max_grad_norm: 0.5
