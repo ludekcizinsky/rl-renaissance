@@ -5,13 +5,13 @@ class KineticEnv:
         """
         Environment for kinetic model parameters refinement.
         """
-
         self.param_dim = cfg.env.p_size
         self.min_val = cfg.constraints.min_km
         self.max_val = cfg.constraints.max_km
         self.reward_fn = reward_fn
         self.max_steps = cfg.training.max_steps_per_episode
         self.device = cfg.device
+        self.action_scale = cfg.env.action_scale
 
         self._reset_generator = torch.Generator(device=self.device)
         self._reset_generator.manual_seed(cfg.seed)
@@ -40,6 +40,7 @@ class KineticEnv:
             next_state (Tensor), reward (float), done (bool)
         """
         action = action.to(self.device)
+        action = self.action_scale * action
         # update and clamp
         self.state = (self.state + action).clamp(
             min=self.min_val, max=self.max_val

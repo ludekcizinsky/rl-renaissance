@@ -29,8 +29,7 @@ constraints:
 reward:
   # eigenvalue partition between valid and invalid models
   eig_partition: -2.5
-  intermediate_steps_weight: 0.01
-  n_samples: 10
+  intermediate_steps_weight: 1.0
 
 env:
   # Initial mean and std the normal distribution for p0
@@ -38,6 +37,7 @@ env:
   p0_init_std: 1
   # Total number of kinetic parameters
   p_size: 384 
+  action_scale: 1.0
 
 training:
   num_episodes: 100
@@ -45,6 +45,7 @@ training:
   batch_size: 25
   num_epochs: 10
   max_grad_norm: 0.5
+  n_dist_samples: 1
 
 
 # Just to let Hydra know where to save the config file
