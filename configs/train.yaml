@@ -1,5 +1,6 @@
 defaults:
   - method: refinement_ppo
+  - lr_scheduler: linear_decay
   - _self_
 
 seed: 42

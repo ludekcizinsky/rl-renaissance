@@ -5,6 +5,7 @@ import torch.optim as optim
 from helpers.buffers import TrajectoryBuffer
 from helpers.env import KineticEnv
 from helpers.utils import compute_grad_norm
+from helpers.lr_schedulers import get_lr_scheduler
 from typing import Dict
 
 class PolicyNetwork(nn.Module):
@@ -71,6 +72,11 @@ class PPOAgent:
         self.value_net = ValueNetwork(cfg).to(self.device)
         self.policy_optimizer = optim.AdamW(self.policy_net.parameters(), lr=cfg.method.actor_lr)
         self.value_optimizer = optim.AdamW(self.value_net.parameters(), lr=cfg.method.critic_lr)
+
+        self.policy_scheduler = get_lr_scheduler(cfg, self.policy_optimizer)
+        self.value_scheduler = get_lr_scheduler(cfg, self.value_optimizer)
+
+        self.global_step = 0
 
     def collect_trajectory(self, env: KineticEnv):
         buf = TrajectoryBuffer()
@@ -139,16 +145,27 @@ class PPOAgent:
         self.value_optimizer.zero_grad()
         loss.backward()
 
-        # self.run.log({"optim/policy_pre_clip_grad_norm": compute_grad_norm(self.policy_net)})
+        log_info = {}
+        # --- gradient norms ---
+        log_info["optim/pnet_pre_clip_grad_norm"] = compute_grad_norm(self.policy_net)
         torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), max_grad_norm)
-        # self.run.log({"optim/policy_post_clip_grad_norm": compute_grad_norm(self.policy_net)})
+        log_info["optim/pnet_post_clip_grad_norm"] = compute_grad_norm(self.policy_net)
 
-        # self.run.log({"optim/value_pre_clip_grad_norm": compute_grad_norm(self.value_net)})
+        log_info["optim/vnet_pre_clip_grad_norm"] = compute_grad_norm(self.value_net)
         torch.nn.utils.clip_grad_norm_(self.value_net.parameters(), max_grad_norm)
-        # self.run.log({"optim/value_post_clip_grad_norm": compute_grad_norm(self.value_net)})
+        log_info["optim/vnet_post_clip_grad_norm"] = compute_grad_norm(self.value_net)
 
+        # --- step policy optimizer & log its LR ---
         self.policy_optimizer.step()
+        self.policy_scheduler.step()
+        log_info["optim/policy_lr"] = self.policy_optimizer.param_groups[0]['lr']
+
+        # --- step value optimizer & log its LR ---
         self.value_optimizer.step()
+        self.value_scheduler.step()
+        log_info["optim/value_lr"] = self.value_optimizer.param_groups[0]['lr']
+
+        return log_info
 
     def update(self, trajectory: Dict[str, torch.Tensor]):
         """
@@ -180,6 +197,7 @@ class PPOAgent:
         for _ in range(self.cfg.training.num_epochs):  
             idxs = torch.randperm(T) # shuffle indices
             for start in range(0, T, self.cfg.training.batch_size):
+                step_log_info = {"global_step": self.global_step}
 
                 # get batch of data
                 batch_idxs = idxs[start : start + self.cfg.training.batch_size]
@@ -205,11 +223,23 @@ class PPOAgent:
                 value_loss = (b_returns - new_values).pow(2).mean()
 
                 # combined loss
+                pnet_log_std_penalty = 1e-3 * (self.policy_net.log_std**2).sum()
                 loss = policy_loss \
                      + self.cfg.method.value_loss_weight * value_loss \
-                     + 1e-3 * (self.policy_net.log_std**2).sum() # to prevent log_std from exploding
+                     + pnet_log_std_penalty
+                
+                step_log_info["ppo/policy_loss"] = policy_loss.item()
+                step_log_info["ppo/value_loss"] = value_loss.item()
+                step_log_info["ppo/weighted_value_loss"] = self.cfg.method.value_loss_weight * value_loss.item()
+                step_log_info["ppo/pnet_log_std_penalty"] = pnet_log_std_penalty.item()
+                step_log_info["ppo/loss"] = loss.item()
 
                 # optimize
-                self._optimize_policy(loss, self.cfg.training.max_grad_norm)
+                optim_log_info = self._optimize_policy(loss, self.cfg.training.max_grad_norm)
+                step_log_info.update(optim_log_info)
+
+                # log
+                self.run.log(step_log_info)
+                self.global_step += 1
 
         return policy_loss.item(), value_loss.item()

@@ -13,7 +13,8 @@ def get_wandb_run(cfg: DictConfig):
         dir=cfg.paths.output_dir,
     )
 
-    run.define_metric(name="ppo/*", step_metric="episode")
+    run.define_metric(name="ppo/*", step_metric="global_step")
+    run.define_metric(name="optim/*", step_metric="global_step")
     run.define_metric(name="reward/*", step_metric="episode")
 
     return run
