@@ -40,8 +40,8 @@ env:
   p_size: 384 
 
 training:
-  num_episodes: 300
-  max_steps_per_episode: 100
+  num_episodes: 100
+  max_steps_per_episode: 20
   batch_size: 25
   num_epochs: 10
   max_grad_norm: 0.5
