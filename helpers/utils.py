@@ -82,3 +82,23 @@ def load_pkl(name: str) -> Any:
     name = name.replace('.pkl', '')
     with open(name + '.pkl', 'rb') as f:
         return pickle.load(f)
+
+
+def compute_grad_norm(model, norm_type: float = 2.0) -> float:
+    """
+    Compute the total gradient norm over all model parameters.
+    
+    Args:
+        model (torch.nn.Module): your model
+        norm_type (float): the p‐norm to use (default: 2)
+    
+    Returns:
+        float: the total norm (as a Python float)
+    """
+    total_norm = 0.0
+    for p in model.parameters():
+        if p.grad is not None:
+            param_norm = p.grad.data.norm(norm_type)
+            total_norm += param_norm.item() ** norm_type
+    total_norm = total_norm ** (1.0 / norm_type)
+    return total_norm

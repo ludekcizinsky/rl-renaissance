@@ -4,7 +4,7 @@ import torch.optim as optim
 
 from helpers.buffers import TrajectoryBuffer
 from helpers.env import KineticEnv
-
+from helpers.utils import compute_grad_norm
 from typing import Dict
 
 class PolicyNetwork(nn.Module):
@@ -61,10 +61,10 @@ class ValueNetwork(nn.Module):
         return value.squeeze()
 
 class PPOAgent:
-    def __init__(self, cfg, logger):
+    def __init__(self, cfg, run):
 
         self.cfg = cfg
-        self.logger = logger
+        self.run = run
 
         self.policy_net = PolicyNetwork(cfg)
         self.value_net = ValueNetwork(cfg)
@@ -136,8 +136,15 @@ class PPOAgent:
         self.policy_optimizer.zero_grad()
         self.value_optimizer.zero_grad()
         loss.backward()
+
+        # self.run.log({"optim/policy_pre_clip_grad_norm": compute_grad_norm(self.policy_net)})
         torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), max_grad_norm)
+        # self.run.log({"optim/policy_post_clip_grad_norm": compute_grad_norm(self.policy_net)})
+
+        # self.run.log({"optim/value_pre_clip_grad_norm": compute_grad_norm(self.value_net)})
         torch.nn.utils.clip_grad_norm_(self.value_net.parameters(), max_grad_norm)
+        # self.run.log({"optim/value_post_clip_grad_norm": compute_grad_norm(self.value_net)})
+
         self.policy_optimizer.step()
         self.value_optimizer.step()
 
@@ -199,10 +206,9 @@ class PPOAgent:
                 # combined loss
                 loss = policy_loss \
                      + self.cfg.method.value_loss_weight * value_loss \
-                     - self.cfg.method.entropy_loss_weight * entropy \
                      + 1e-3 * (self.policy_net.log_std**2).sum() # to prevent log_std from exploding
 
                 # optimize
                 self._optimize_policy(loss, self.cfg.training.max_grad_norm)
 
-        return policy_loss.item(), value_loss.item(), entropy.item()
+        return policy_loss.item(), value_loss.item()

@@ -8,6 +8,7 @@ from renaissance.kinetics.jacobian_solver import check_jacobian
 from helpers.ppo_agent import PPOAgent
 from helpers.env import KineticEnv
 from helpers.utils import reward_func, load_pkl
+from helpers.logger import get_wandb_run
 
 import logging
 
@@ -27,8 +28,8 @@ def train(cfg: DictConfig):
     chk_jcbn._load_ktmodels(cfg.paths.met_model_name, 'fdp1') # Load kinetic and thermodynamic data
     chk_jcbn._load_ssprofile(cfg.paths.met_model_name, 'fdp1', cfg.constraints.ss_idx) # Integrate steady state information
 
-    # Logger setup, todo: for now disabled, else we would get w&b run object
-    logger = None # get_logger(cfg)
+    # Logger setup
+    run = get_wandb_run(cfg)
 
     # Initialize environment
     names_km = load_pkl(cfg.paths.names_km)
@@ -37,17 +38,17 @@ def train(cfg: DictConfig):
     env.seed(cfg.seed)
 
     # Initialize PPO agent (actor and critic)
-    ppo_agent = PPOAgent(cfg, logger)
+    ppo_agent = PPOAgent(cfg, run)
    
     # Training loop
     for episode in range(cfg.training.num_episodes):
         trajectory = ppo_agent.collect_trajectory(env)
         rewards = trajectory["rewards"]
         min_rew, max_rew, mean_rew = rewards.min(), rewards.max(), rewards.mean()
-        print(f"Episode {episode+1}/{cfg.training.num_episodes} - Min reward: {min_rew:.4f}, Max reward: {max_rew:.4f}, Mean reward: {mean_rew:.4f}")
+        run.log({"reward/min_rew": min_rew, "reward/max_rew": max_rew, "reward/mean_rew": mean_rew, "episode": episode})
 
-        policy_loss, value_loss, entropy = ppo_agent.update(trajectory)
-        print(f"Episode {episode+1}/{cfg.training.num_episodes} - Policy loss: {policy_loss:.4f}, Value loss: {value_loss:.4f}, Entropy: {entropy:.4f}")
+        policy_loss, value_loss = ppo_agent.update(trajectory)
+        run.log({"ppo/policy_loss": policy_loss, "ppo/value_loss": value_loss, "episode": episode})
 
 
 if __name__ == "__main__":
