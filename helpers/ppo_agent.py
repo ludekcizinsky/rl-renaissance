@@ -71,18 +71,47 @@ class PPOAgent:
         self.policy_optimizer = optim.AdamW(self.policy_net.parameters(), lr=cfg.method.actor_lr)
         self.value_optimizer = optim.AdamW(self.value_net.parameters(), lr=cfg.method.critic_lr)
 
+    # def collect_trajectory(self, env: KineticEnv):
+    #     buf = TrajectoryBuffer()
+
+    #     state = env.reset()
+    #     for t in range(self.cfg.training.max_steps_per_episode):
+    #         mean, std = self.policy_net(state)
+    #         dist = torch.distributions.Normal(mean, std)
+    #         action = dist.rsample()
+    #         log_prob = dist.log_prob(action).sum()
+    #         value = self.value_net(state)
+
+    #         next_state, reward, done = env.step(action)
+
+    #         if t == self.cfg.training.max_steps_per_episode - 1:
+    #             reward = reward
+    #         else:
+    #             reward *= self.cfg.reward.intermediate_steps_weight
+
+    #         buf.add(state, action, log_prob, value, reward, done)
+    #         state = next_state
+    #         if done:
+    #             break
+
+    #     trajectory = buf.to_tensors()
+    #     buf.clear()
+    #     return trajectory
+
     def collect_trajectory(self, env: KineticEnv):
         buf = TrajectoryBuffer()
 
         state = env.reset()
-        for _ in range(self.cfg.training.max_steps_per_episode):
+        for t in range(self.cfg.training.max_steps_per_episode):
             mean, std = self.policy_net(state)
             dist = torch.distributions.Normal(mean, std)
             action = dist.rsample()
             log_prob = dist.log_prob(action).sum()
             value = self.value_net(state)
 
-            next_state, reward, done = env.step(action)
+            next_state, reward, _ = env.step(action)
+
+            done = t == self.cfg.training.max_steps_per_episode - 1
 
             buf.add(state, action, log_prob, value, reward, done)
             state = next_state

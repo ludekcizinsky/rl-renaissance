@@ -1,0 +1,40 @@
+method:
+  parameter_dim: 384
+  latent_dim: 99
+  name: ppo_refinement
+  actor_lr: 0.0003
+  critic_lr: 0.001
+  discount_factor: 0.99
+  gae_lambda: 0.98
+  clip_eps: 0.2
+  value_loss_weight: 0.5
+  entropy_loss_weight: 0.0
+seed: 42
+device: cpu
+logger:
+  project: rl-renaissance
+  entity: ludekcizinsky
+  tags:
+  - dev
+paths:
+  names_km: data/varma_ecoli_shikki/parameter_names_km_fdp1.pkl
+  output_dir: /home/renaissance/work/output
+  met_model_name: varma_ecoli_shikki
+constraints:
+  min_km: -25
+  max_km: 3
+  ss_idx: 1712
+reward:
+  eig_partition: -2.5
+  intermediate_steps_weight: 0.01
+  n_samples: 10
+env:
+  p0_init_mean: 0
+  p0_init_std: 1
+  p_size: 384
+training:
+  num_episodes: 100
+  max_steps_per_episode: 50
+  batch_size: 25
+  num_epochs: 10
+  max_grad_norm: 0.5
