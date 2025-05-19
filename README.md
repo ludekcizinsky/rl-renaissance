@@ -40,7 +40,7 @@ Assuming you have cloned our rl repo and you are currently in it, you can start 
 and the python packages directory to the one you created earlier (do not change the paths within the container). Finally, double check that you also mount the `.netrc` file (I include mine in the command below):
 
 ```bash
-sudo docker run --rm -it -v "$(pwd)":/home/renaissance/work -v "/home/rl_team/ludek/output:/home/renaissance/output" -v "/home/rl_team/python_packages:/home/renaissance/.local" "/home/rl_team/ludek/.netrc:/home/renaissance/.netrc" ludekcizinsky/renaissance_with_ml
+sudo docker run --rm -it -v "$(pwd)":/home/renaissance/work -v "/home/rl_team/ludek/output:/home/renaissance/output" -v "/home/rl_team/python_packages:/home/renaissance/.local" -v "/home/rl_team/ludek/.netrc:/home/renaissance/.netrc" ludekcizinsky/renaissance_with_ml
 ```
 
 Finally, since we have to work with python 3.6, we have to downgrade weights and biases:
@@ -78,26 +78,6 @@ python -c "import skimpy; import torch;print('Success')"
 ```
 
 Finally, note that you can use GPU to speed up the training. In the config, set `device: cuda`.
-
-### On node provided by Ilias
-
-Assuming you have Docker desktop installed, you can run the following commands to pull the image locally (takes a couple of minutes):
-
-```bash
-docker pull ludekcizinsky/renaissance_with_ml:latest
-```
-
-Then, start the docker container using the below command (make sure to change the path `path_to_local_output` accordingly):
-
-```bash
-sudo docker run --rm -it -u $(id -u):$(id -g) -v "$(pwd)":/home/renaissance/work ludekcizinsky/renaissance_with_ml
-```
-
-If things go well, you should be able to execute the following command to check if the image is working:
-
-```bash
-python -c "import skimpy; import torch;print('Success')"
-```
 
 ## Running the code
 
