@@ -65,16 +65,17 @@ class PPOAgent:
 
         self.cfg = cfg
         self.run = run
+        self.device = torch.device(cfg.device)
 
-        self.policy_net = PolicyNetwork(cfg)
-        self.value_net = ValueNetwork(cfg)
+        self.policy_net = PolicyNetwork(cfg).to(self.device)
+        self.value_net = ValueNetwork(cfg).to(self.device)
         self.policy_optimizer = optim.AdamW(self.policy_net.parameters(), lr=cfg.method.actor_lr)
         self.value_optimizer = optim.AdamW(self.value_net.parameters(), lr=cfg.method.critic_lr)
 
     def collect_trajectory(self, env: KineticEnv):
         buf = TrajectoryBuffer()
 
-        state = env.reset()
+        state = env.reset().to(self.device)
         for _ in range(self.cfg.training.max_steps_per_episode):
             mean, std = self.policy_net(state)
             dist = torch.distributions.Normal(mean, std)
@@ -83,6 +84,7 @@ class PPOAgent:
             value = self.value_net(state)
 
             next_state, reward, done = env.step(action)
+            next_state = next_state.to(self.device)
 
             buf.add(state, action, log_prob, value, reward, done)
             state = next_state
@@ -116,7 +118,7 @@ class PPOAgent:
         gae_lambda = self.cfg.method.gae_lambda
 
         T = rewards.size(0)
-        advantages = torch.zeros_like(rewards)
+        advantages = torch.zeros_like(rewards, device=self.device)
         gae = 0.0
         for t in reversed(range(T)):
             mask = 1.0 - dones[t]   # 0 if episode ended
@@ -191,7 +193,6 @@ class PPOAgent:
                 mean, std = self.policy_net(b_states)
                 dist = torch.distributions.Normal(mean, std)
                 new_logp = dist.log_prob(b_actions).sum(dim=-1)
-                entropy = dist.entropy().sum(dim=-1).mean()
 
                 # ratio for clipped surrogate
                 ratio = torch.exp(new_logp - b_oldlp)

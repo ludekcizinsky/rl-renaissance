@@ -77,11 +77,14 @@ def reward_func(chk_jcbn, names_km, eig_partition: float, gen_kinetic_params: to
     return reward
 
 
-def load_pkl(name: str) -> Any:
-    """load a pickle object"""
-    name = name.replace('.pkl', '')
-    with open(name + '.pkl', 'rb') as f:
+def load_pkl(path: str) -> Any:
+    with open(path, 'rb') as f:
         return pickle.load(f)
+
+
+def save_pkl(path: str, obj: Any):
+    with open(path, 'wb') as f:
+        pickle.dump(obj, f)
 
 
 def compute_grad_norm(model, norm_type: float = 2.0) -> float:

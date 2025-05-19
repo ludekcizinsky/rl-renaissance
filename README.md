@@ -49,7 +49,7 @@ Then, you can run the image with the following command:
 
 ```bash
 mkdir -p /scratch/izar/$USER/rl-for-kinetics/output
-apptainer shell --bind "$(pwd)":/home/renaissance/work --bind "/scratch/izar/$USER/rl-for-kinetics/output:/home/renaissance/output" /scratch/izar/$USER/images/renaissance_with_ml.sif
+apptainer shell --nv --bind "$(pwd)":/home/renaissance/work --bind "/scratch/izar/$USER/rl-for-kinetics/output:/home/renaissance/output" /scratch/izar/$USER/images/renaissance_with_ml.sif
 ```
 
 If things go well, you should be able to execute the following command to check if the image is working:

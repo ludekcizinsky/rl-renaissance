@@ -11,9 +11,9 @@ class KineticEnv:
         self.max_val = cfg.constraints.max_km
         self.reward_fn = reward_fn
         self.max_steps = cfg.training.max_steps_per_episode
-        self.device = cfg.device
+        self.device = torch.device("cpu")
 
-        self._reset_generator = torch.Generator(device=self.device)
+        self._reset_generator = torch.Generator()
         self._reset_generator.manual_seed(cfg.seed)
 
         self.state = None
