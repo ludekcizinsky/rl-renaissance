@@ -36,7 +36,7 @@ If things go well, you should be able to execute the following command to check 
 python -c "import skimpy; import torch;print('Success')"
 ```
 
-### Izar (not updated)
+### Izar 
 
 First, pull the image from the Docker registry using apptainer (takes a couple of minutes):
 
@@ -57,6 +57,8 @@ If things go well, you should be able to execute the following command to check 
 ```bash
 python -c "import skimpy; import torch;print('Success')"
 ```
+
+Finally, note that you can use GPU to speed up the training. In the config, set `device: cuda`.
 
 ### On node provided by Ilias
 

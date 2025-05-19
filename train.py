@@ -8,7 +8,7 @@ from helpers.jacobian_solver import check_jacobian
 
 from helpers.ppo_agent import PPOAgent
 from helpers.env import KineticEnv
-from helpers.utils import reward_func, load_pkl, log_rl_models
+from helpers.utils import reward_func, load_pkl, log_rl_models, log_reward_distribution
 from helpers.logger import get_wandb_run
 
 import logging
@@ -47,8 +47,7 @@ def train(cfg: DictConfig):
         # Collect trajectory
         trajectory = ppo_agent.collect_trajectory(env, episode)
         rewards = trajectory["rewards"]
-        min_rew, max_rew, mean_rew = rewards.min(), rewards.max(), rewards.mean()
-        run.log({"reward/min_rew": min_rew, "reward/max_rew": max_rew, "reward/mean_rew": mean_rew, "episode": episode})
+        log_reward_distribution(rewards, episode)
 
         # Update PPO agent
         ppo_agent.update(trajectory)

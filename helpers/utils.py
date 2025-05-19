@@ -147,6 +147,32 @@ def log_max_eig_dist_and_incidence_rate(max_eig_values, was_valid_solution, epis
     plt.close(fig)
 
 
+def log_reward_distribution(rewards, episode: int):
+
+    data = np.asarray(rewards)
+
+    fig, ax = plt.subplots(figsize=(9, 6), dpi=100)
+
+    kde = gaussian_kde(data, bw_method=0.2)
+
+    x_min, x_max = data.min() - 1, data.max() + 1
+    x = np.linspace(x_min, x_max, 500)
+    y = kde(x)
+
+    ax.plot(x, y, lw=2)
+    ax.fill_between(x, y, alpha=0.3)
+    ax.set_xlabel("reward")
+    ax.set_ylabel("density")
+    ax.set_title("Smoothed density of reward")
+    fig.tight_layout()
+
+    wandb.log({
+        "reward/distribution": wandb.Image(fig), 
+        "episode": episode
+    })
+    plt.close(fig)
+
+
 def log_rl_models(
     policy_net: torch.nn.Module,
     value_net:  torch.nn.Module,
