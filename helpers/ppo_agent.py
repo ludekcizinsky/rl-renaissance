@@ -4,9 +4,10 @@ import torch.optim as optim
 
 from helpers.buffers import TrajectoryBuffer
 from helpers.env import KineticEnv
-from helpers.utils import compute_grad_norm
+from helpers.utils import compute_grad_norm, log_max_eig_dist_and_incidence_rate
 from helpers.lr_schedulers import get_lr_scheduler
 from typing import Dict
+
 
 class PolicyNetwork(nn.Module):
     def __init__(self, cfg):
@@ -78,7 +79,7 @@ class PPOAgent:
 
         self.global_step = 0
 
-    def collect_trajectory(self, env: KineticEnv):
+    def collect_trajectory(self, env: KineticEnv, episode: int):
         buf = TrajectoryBuffer()
 
         state = env.reset().to(self.device)
@@ -96,6 +97,9 @@ class PPOAgent:
             state = next_state
             if done:
                 break
+        
+        log_max_eig_dist_and_incidence_rate(env.max_eig_values, env.was_valid_solution, episode)
+
 
         trajectory = buf.to_tensors()
         buf.clear()

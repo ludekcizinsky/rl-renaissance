@@ -1,10 +1,11 @@
 defaults:
   - method: refinement_ppo
-  - lr_scheduler: linear_decay
+  - lr_scheduler: cosine
   - _self_
 
 seed: 42
 device: cuda
+launch_cmd: null # will be set at runtime dynamically
 
 # for now ignore, we don't use wandb yet
 logger:

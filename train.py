@@ -1,4 +1,4 @@
-import os
+import sys
 from functools import partial
 
 import hydra
@@ -30,6 +30,7 @@ def train(cfg: DictConfig):
     chk_jcbn._load_ssprofile(cfg.paths.met_model_name, 'fdp1', cfg.constraints.ss_idx) # Integrate steady state information
 
     # Logger setup
+    cfg.launch_cmd = " ".join(sys.argv)
     run = get_wandb_run(cfg)
 
     # Initialize environment
@@ -43,14 +44,14 @@ def train(cfg: DictConfig):
    
     # Training loop
     for episode in range(cfg.training.num_episodes):
-        trajectory = ppo_agent.collect_trajectory(env)
+        # Collect trajectory
+        trajectory = ppo_agent.collect_trajectory(env, episode)
         rewards = trajectory["rewards"]
         min_rew, max_rew, mean_rew = rewards.min(), rewards.max(), rewards.mean()
         run.log({"reward/min_rew": min_rew, "reward/max_rew": max_rew, "reward/mean_rew": mean_rew, "episode": episode})
 
-        policy_loss, value_loss = ppo_agent.update(trajectory)
-        run.log({"ppo/policy_loss": policy_loss, "ppo/value_loss": value_loss, "episode": episode})
-
+        # Update PPO agent
+        ppo_agent.update(trajectory)
 
 if __name__ == "__main__":
     train()

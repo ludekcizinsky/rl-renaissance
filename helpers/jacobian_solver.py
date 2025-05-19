@@ -64,15 +64,15 @@ class check_jacobian():
             this_jacobian = self.kmodel.jacobian_fun(self.flux_series[self.kmodel.reactions],
                                     self.conc_series[self.kmodel.reactants],self.parameter_sample)
 
-            this_real_eigenvalues = np.max(np.real(eigenvalues(this_jacobian.todense())))
-            store_eigen.append(this_real_eigenvalues)
+            system_eigenvalues = np.real(eigenvalues(this_jacobian.todense()))
+            store_eigen.append(system_eigenvalues)
             this_param_sample = ParameterValues(self.parameter_sample, self.kmodel)
             param_pop.append(this_param_sample)
 
             del(this_param_sample)
             del(param_val)
             del(this_jacobian)
-            del(this_real_eigenvalues)
+            del(system_eigenvalues)
 
 
         return store_eigen
