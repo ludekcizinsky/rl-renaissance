@@ -43,18 +43,23 @@ def train(cfg: DictConfig):
     ppo_agent = PPOAgent(cfg, run)
    
     # Training loop
-    for episode in range(cfg.training.num_episodes):
-        # Collect trajectory
-        trajectory = ppo_agent.collect_trajectory(env, episode)
-        rewards = trajectory["rewards"]
-        log_reward_distribution(rewards, episode)
+    try:
+        for episode in range(cfg.training.num_episodes):
+            # Collect trajectory
+            trajectory = ppo_agent.collect_trajectory(env, episode)
+            rewards = trajectory["rewards"]
+            log_reward_distribution(rewards, episode)
 
-        # Update PPO agent
-        ppo_agent.update(trajectory)
+            # Update PPO agent
+            ppo_agent.update(trajectory)
 
-    # Log models
-    if cfg.training.save_trained_models:
-        log_rl_models(ppo_agent.policy_net, ppo_agent.value_net, save_dir=cfg.paths.output_dir)
+        # Log models
+        if cfg.training.save_trained_models:
+            log_rl_models(ppo_agent.policy_net, ppo_agent.value_net, save_dir=cfg.paths.output_dir)
+    except Exception as e:
+        print(f"Error: {e}")
+        print(f"Traceback: {e.__traceback__}")
+        print("-" * 50)
 
     
     # Finish wandb run
