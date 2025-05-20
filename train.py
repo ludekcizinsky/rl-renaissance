@@ -37,7 +37,7 @@ def train(cfg: DictConfig):
 
     # Initialize environment
     names_km = load_pkl(cfg.paths.names_km)
-    reward_fn = partial(reward_func, chk_jcbn, names_km, cfg.reward.eig_partition)
+    reward_fn = partial(reward_func, chk_jcbn, names_km, cfg.reward)
     env = KineticEnv(cfg, reward_fn)
     env.seed(cfg.seed)
 

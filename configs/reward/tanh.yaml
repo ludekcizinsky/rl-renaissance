@@ -1,0 +1,6 @@
+defaults:
+  - default # load the default parameters
+
+
+name: tanh
+beta: 2.0

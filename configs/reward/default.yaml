@@ -1,0 +1,5 @@
+eig_partition: -2.5
+intermediate_steps_weight: 1.0
+center: true
+clip: true
+clip_range: [-4, 4]

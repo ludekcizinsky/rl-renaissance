@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
 import wandb
 
+from helpers.rewards import get_reward
+
 def get_timestep_embedding(timestep: int, embedding_dim: int, max_period: float = 10000) -> torch.Tensor:
     """
     Maps an integer timestep to a torch tensor using sinusoidal positional embeddings.
@@ -57,7 +59,7 @@ def get_initial_state(cfg: DictConfig) -> torch.Tensor:
     return p_curr
 
 
-def reward_func(chk_jcbn, names_km, eig_partition: float, gen_kinetic_params: torch.Tensor):
+def reward_func(chk_jcbn, names_km, rew_cfg: DictConfig, gen_kinetic_params: torch.Tensor):
     """
     Calculate the reward for a 1D tensor of kinetic parameters.
     """
@@ -73,11 +75,7 @@ def reward_func(chk_jcbn, names_km, eig_partition: float, gen_kinetic_params: to
     max_eig = np.max(all_eigenvalues)
 
     # Calculate the reward
-    # TODO: this is somewhat adapted from the original Renaissance code
-    # but needs further investigation
-    # reward = 0.01 / (1 + np.exp(max_eig - eig_partition))
-    z = np.clip(max_eig - eig_partition, -20, +20)
-    reward = 1.0 / (1.0 + np.exp(z)) + 1e-3  # now ∈ (0,1)
+    reward = get_reward(max_eig, rew_cfg)
 
     return reward, all_eigenvalues
 
@@ -153,17 +151,10 @@ def log_reward_distribution(rewards, episode: int):
 
     fig, ax = plt.subplots(figsize=(9, 6), dpi=100)
 
-    kde = gaussian_kde(data, bw_method=0.2)
-
-    x_min, x_max = data.min() - 1, data.max() + 1
-    x = np.linspace(x_min, x_max, 500)
-    y = kde(x)
-
-    ax.plot(x, y, lw=2)
-    ax.fill_between(x, y, alpha=0.3)
+    ax.hist(data, bins=10)
     ax.set_xlabel("reward")
-    ax.set_ylabel("density")
-    ax.set_title("Smoothed density of reward")
+    ax.set_ylabel("count")
+    ax.set_title("Reward distribution")
     fig.tight_layout()
 
     wandb.log({
