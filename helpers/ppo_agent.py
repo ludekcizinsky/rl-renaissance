@@ -108,9 +108,9 @@ class PPOAgent:
         last_step_buffer = TrajectoryBuffer()
         for _ in range(self.cfg.training.n_dist_samples):
             results = self._take_action_and_step(env, state, dist)
-            i_action, i_log_prob, i_value, _, i_sample_reward = results
-            last_step_buffer.add_last_step(i_action, i_log_prob, i_value, i_sample_reward)
-        action, log_prob, value, next_state, reward = last_step_buffer.aggregate_last_step()
+            i_action, i_log_prob, i_value, i_next_state, i_sample_reward = results
+            last_step_buffer.add_last_step(i_action, i_next_state, i_log_prob, i_value, i_sample_reward)
+        action, next_state, log_prob, value, reward = last_step_buffer.aggregate_last_step()
         done = True
 
         return action, log_prob, value, next_state, reward, done
@@ -136,9 +136,9 @@ class PPOAgent:
                 reward = self.cfg.reward.intermediate_steps_weight * sample_reward
 
             buf.add(state, action, log_prob, value, reward, done)
+            state = next_state
             if done:
                 break
-            state = next_state
         
         log_max_eig_dist_and_incidence_rate(env.max_eig_values, env.was_valid_solution, episode)
 
@@ -276,14 +276,9 @@ class PPOAgent:
                 value_loss = (b_returns - new_values).pow(2).mean()
                 step_log_info["ppo/value_loss"] = value_loss.item()
 
-                # penalty for log std
-                pnet_log_std_penalty = 1e-3 * (self.policy_net.log_std**2).sum()
-                step_log_info["ppo/pnet_log_std_penalty"] = pnet_log_std_penalty.item()
-
                 # combined loss
                 loss = policy_loss \
-                     + self.cfg.method.value_loss_weight * value_loss \
-                     + pnet_log_std_penalty
+                     + self.cfg.method.value_loss_weight * value_loss
                 step_log_info["ppo/loss"] = loss.item()
 
                 # optimize

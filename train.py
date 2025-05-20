@@ -13,6 +13,8 @@ from helpers.logger import get_wandb_run
 
 import logging
 
+import traceback
+
 @hydra.main(config_path="configs", config_name="train.yaml", version_base="1.1")
 def train(cfg: DictConfig):
 
@@ -58,7 +60,7 @@ def train(cfg: DictConfig):
             log_rl_models(ppo_agent.policy_net, ppo_agent.value_net, save_dir=cfg.paths.output_dir)
     except Exception as e:
         print(f"Error: {e}")
-        print(f"Traceback: {e.__traceback__}")
+        print(f"Traceback: {traceback.format_exc()}")
         print("-" * 50)
 
     
