@@ -14,34 +14,32 @@ class PolicyNetwork(nn.Module):
         super().__init__()
 
         self.cfg = cfg
-        hidden_dim = 4*cfg.env.p_size
-        self.net = nn.Sequential(
+        hidden_dim = 4 * cfg.env.p_size
+        # Shared base network
+        self.base = nn.Sequential(
             nn.Linear(cfg.env.p_size, hidden_dim),
             nn.LayerNorm(hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim),
             nn.LayerNorm(hidden_dim),
-            nn.ReLU(),
+            nn.ReLU()
+        )
+        # Separate heads for mean and log_std
+        self.mean_head = nn.Sequential(
+            nn.Linear(hidden_dim, cfg.env.p_size),
+            nn.LayerNorm(cfg.env.p_size)
+        )
+        self.log_std_head = nn.Sequential(
             nn.Linear(hidden_dim, cfg.env.p_size),
             nn.LayerNorm(cfg.env.p_size)
         )
 
-        self.log_std = nn.Parameter(torch.full((cfg.env.p_size,), -0.5))
-
-    def bound_action(self, action):
-        action = torch.clamp(action, self.cfg.constraints.min_km, self.cfg.constraints.max_km)
-        return action
-
     def forward(self, x):
-        mean = self.net(x)
-        std = torch.exp(self.log_std)
+        base_out = self.base(x)
+        mean = self.mean_head(base_out)
+        log_std = self.log_std_head(base_out)
+        std = torch.exp(log_std)
         return mean, std
-
-    def get_action(self, state):
-        mean, std = self.forward(state)
-        action = torch.normal(mean, std)
-        action = self.bound_action(action)
-        return action
 
 class ValueNetwork(nn.Module):
     def __init__(self, cfg):
@@ -79,19 +77,53 @@ class PPOAgent:
 
         self.global_step = 0
 
+    def _take_action_and_step(self, env, state, dist):
+        """
+        Sample once and take a step.
+        """
+
+        action = dist.rsample()
+        log_prob = dist.log_prob(action).sum()
+        value = self.value_net(state)
+
+        next_state, sample_reward, _ = env.step(action)
+        next_state = next_state.to(self.device)
+
+        return action, log_prob, value, next_state, sample_reward
+
+    def _get_last_step_results(self, env, state, dist):
+        """
+        Sample multiple times and aggregate the results using mean.
+        """
+        last_step_buffer = TrajectoryBuffer()
+        for _ in range(self.cfg.training.n_dist_samples):
+            results = self._take_action_and_step(env, state, dist)
+            i_action, i_log_prob, i_value, i_next_state, i_sample_reward = results
+            last_step_buffer.add_last_step(i_action, i_next_state, i_log_prob, i_value, i_sample_reward)
+        action, next_state, log_prob, value, reward = last_step_buffer.aggregate_last_step()
+        done = True
+
+        return action, log_prob, value, next_state, reward, done
+
     def collect_trajectory(self, env: KineticEnv, episode: int):
         buf = TrajectoryBuffer()
 
         state = env.reset().to(self.device)
-        for _ in range(self.cfg.training.max_steps_per_episode):
+        done = False
+        for t in range(self.cfg.training.max_steps_per_episode):
             mean, std = self.policy_net(state)
             dist = torch.distributions.Normal(mean, std)
-            action = dist.rsample()
-            log_prob = dist.log_prob(action).sum()
-            value = self.value_net(state)
 
-            next_state, reward, done = env.step(action)
-            next_state = next_state.to(self.device)
+            # Special case for last step: sample multiple times and aggregate
+            if t == self.cfg.training.max_steps_per_episode - 1:
+                results = self._get_last_step_results(env, state, dist)
+                action, log_prob, value, next_state, reward, done = results
+            
+            # Rest of the steps: sample once
+            else:
+                results = self._take_action_and_step(env, state, dist)
+                action, log_prob, value, next_state, sample_reward = results
+                reward = self.cfg.reward.intermediate_steps_weight * sample_reward
 
             buf.add(state, action, log_prob, value, reward, done)
             state = next_state
@@ -234,14 +266,9 @@ class PPOAgent:
                 value_loss = (b_returns - new_values).pow(2).mean()
                 step_log_info["ppo/value_loss"] = value_loss.item()
 
-                # penalty for log std
-                pnet_log_std_penalty = 1e-3 * (self.policy_net.log_std**2).sum()
-                step_log_info["ppo/pnet_log_std_penalty"] = pnet_log_std_penalty.item()
-
                 # combined loss
                 loss = policy_loss \
-                     + self.cfg.method.value_loss_weight * value_loss \
-                     + pnet_log_std_penalty
+                     + self.cfg.method.value_loss_weight * value_loss
                 step_log_info["ppo/loss"] = loss.item()
 
                 # optimize

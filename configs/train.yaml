@@ -31,13 +31,16 @@ constraints:
 reward:
   # eigenvalue partition between valid and invalid models
   eig_partition: -2.5
+  intermediate_steps_weight: 1.0
 
 env:
   # Initial mean and std the normal distribution for p0
   p0_init_mean: 0
-  p0_init_std: 0.1
+  p0_init_std: 1
   # Total number of kinetic parameters
   p_size: 384 
+  # We update next state as x_new = x + action * action_scale
+  action_scale: 1.0
 
 training:
   num_episodes: 100
@@ -46,6 +49,9 @@ training:
   num_epochs: 10
   max_grad_norm: 0.5
   save_trained_models: true
+  # number of samples to get the end of the final episode to estimate the reward of the final action
+  # 1 = no sampling -> baseline
+  n_dist_samples: 1 
 
 
 # Just to let Hydra know where to save the config file

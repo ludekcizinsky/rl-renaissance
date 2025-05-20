@@ -1,12 +1,13 @@
 import torch
 import wandb
 import numpy as np
+
+
 class KineticEnv:
     def __init__(self, cfg, reward_fn):
         """
         Environment for kinetic model parameters refinement.
         """
-
         self.param_dim = cfg.env.p_size
         self.min_val = cfg.constraints.min_km
         self.max_val = cfg.constraints.max_km
@@ -14,6 +15,7 @@ class KineticEnv:
         self.max_steps = cfg.training.max_steps_per_episode
         self.eig_cutoff = cfg.reward.eig_partition
         self.device = torch.device("cpu")
+        self.action_scale = cfg.env.action_scale
 
         self._reset_generator = torch.Generator()
         self._reset_generator.manual_seed(cfg.seed)
@@ -47,8 +49,9 @@ class KineticEnv:
         Returns:
             next_state (Tensor), reward (float), done (bool)
         """
+        # update state
         action = action.to(self.device)
-        # update and clamp
+        action = self.action_scale * action
         self.state = (self.state + action).clamp(
             min=self.min_val, max=self.max_val
         )
