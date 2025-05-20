@@ -34,22 +34,12 @@ class PolicyNetwork(nn.Module):
             nn.LayerNorm(cfg.env.p_size)
         )
 
-    def bound_action(self, action):
-        action = torch.clamp(action, self.cfg.constraints.min_km, self.cfg.constraints.max_km)
-        return action
-
     def forward(self, x):
         base_out = self.base(x)
         mean = self.mean_head(base_out)
         log_std = self.log_std_head(base_out)
         std = torch.exp(log_std)
         return mean, std
-
-    def get_action(self, state):
-        mean, std = self.forward(state)
-        action = torch.normal(mean, std)
-        action = self.bound_action(action)
-        return action
 
 class ValueNetwork(nn.Module):
     def __init__(self, cfg):
