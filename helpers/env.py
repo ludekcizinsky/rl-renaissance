@@ -23,8 +23,6 @@ class KineticEnv:
         self.state = None
         self.step_count = 0
         self.env_step = 0
-        self.max_eig_values = []
-        self.was_valid_solution = []
 
     def reset(self) -> torch.Tensor:
         """Sample the same deterministic initial params on every reset."""
@@ -36,8 +34,6 @@ class KineticEnv:
             device=self.device
         ) * (self.max_val - self.min_val) + self.min_val
 
-        self.max_eig_values = []
-        self.was_valid_solution = []
         return self.state.clone()
 
     def step(self, action: torch.Tensor):
@@ -60,11 +56,9 @@ class KineticEnv:
         r, all_eigenvalues = self.reward_fn(self.state)
         reward = float(r) if isinstance(r, torch.Tensor) else r
         max_eig_value = np.max(all_eigenvalues)
-        self.max_eig_values.append(max_eig_value)
-        self.was_valid_solution.append(max_eig_value < self.eig_cutoff)
         wandb.log({
             "episode/max_eigenvalue": max_eig_value, 
-            "episode/was_valid_solution": int(self.was_valid_solution[-1]), 
+            "episode/was_valid_solution": int(max_eig_value < self.eig_cutoff), 
             "env_step": self.env_step,
         })
 

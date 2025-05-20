@@ -213,3 +213,26 @@ def log_rl_models(
     wandb.log_artifact(artifact, aliases=["latest"])
 
     print(f"FYI: Logged model to W&B as {run_name}.")
+
+
+def evaluate_and_log_best_setup(env, state, dist, n_samples, episode):
+
+    all_max_eigs = []
+    is_valid_solution = []
+
+    state = state.to("cpu")
+    for _ in range(n_samples):
+        # sample action and get next state accordingly
+        action = dist.rsample()
+        action = action.to("cpu")
+        action = env.action_scale * action
+        next_state = (state + action).clamp(min=env.min_val, max=env.max_val)
+
+        # compute max eigenvalue
+        _, all_eigenvalues = env.reward_fn(next_state)
+        max_eig = np.max(all_eigenvalues)
+        all_max_eigs.append(max_eig)
+        is_valid_solution.append(max_eig < env.eig_cutoff)
+
+
+    log_max_eig_dist_and_incidence_rate(all_max_eigs, is_valid_solution, episode)

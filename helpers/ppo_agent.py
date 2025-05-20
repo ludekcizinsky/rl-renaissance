@@ -1,10 +1,12 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import numpy as np
+import math
 
 from helpers.buffers import TrajectoryBuffer
 from helpers.env import KineticEnv
-from helpers.utils import compute_grad_norm, log_max_eig_dist_and_incidence_rate
+from helpers.utils import compute_grad_norm, evaluate_and_log_best_setup
 from helpers.lr_schedulers import get_lr_scheduler
 from typing import Dict
 
@@ -65,6 +67,7 @@ class PPOAgent:
 
         self.cfg = cfg
         self.run = run
+        self.n_eval_samples_in_episode = cfg.training.n_eval_samples_in_episode
         self.device = torch.device(cfg.device)
 
         self.policy_net = PolicyNetwork(cfg).to(self.device)
@@ -77,61 +80,35 @@ class PPOAgent:
 
         self.global_step = 0
 
-    def _take_action_and_step(self, env, state, dist):
-        """
-        Sample once and take a step.
-        """
-
-        action = dist.rsample()
-        log_prob = dist.log_prob(action).sum()
-        value = self.value_net(state)
-
-        next_state, sample_reward, _ = env.step(action)
-        next_state = next_state.to(self.device)
-
-        return action, log_prob, value, next_state, sample_reward
-
-    def _get_last_step_results(self, env, state, dist):
-        """
-        Sample multiple times and aggregate the results using mean.
-        """
-        last_step_buffer = TrajectoryBuffer()
-        for _ in range(self.cfg.training.n_dist_samples):
-            results = self._take_action_and_step(env, state, dist)
-            i_action, i_log_prob, i_value, i_next_state, i_sample_reward = results
-            last_step_buffer.add_last_step(i_action, i_next_state, i_log_prob, i_value, i_sample_reward)
-        action, next_state, log_prob, value, reward = last_step_buffer.aggregate_last_step()
-        done = True
-
-        return action, log_prob, value, next_state, reward, done
-
     def collect_trajectory(self, env: KineticEnv, episode: int):
         buf = TrajectoryBuffer()
+        best_setup = None
+        best_reward = -math.inf
 
         state = env.reset().to(self.device)
-        done = False
-        for t in range(self.cfg.training.max_steps_per_episode):
+        for _ in range(self.cfg.training.max_steps_per_episode):
             mean, std = self.policy_net(state)
             dist = torch.distributions.Normal(mean, std)
 
-            # Special case for last step: sample multiple times and aggregate
-            if t == self.cfg.training.max_steps_per_episode - 1:
-                results = self._get_last_step_results(env, state, dist)
-                action, log_prob, value, next_state, reward, done = results
-            
-            # Rest of the steps: sample once
-            else:
-                results = self._take_action_and_step(env, state, dist)
-                action, log_prob, value, next_state, sample_reward = results
-                reward = self.cfg.reward.intermediate_steps_weight * sample_reward
+            action = dist.rsample()
+            log_prob = dist.log_prob(action).sum()
+            value = self.value_net(state)
+
+            next_state, reward, done = env.step(action)
+            next_state = next_state.to(self.device)
+
+            if best_setup is None or reward > best_reward:
+                best_setup = (dist, state)
+                best_reward = reward
 
             buf.add(state, action, log_prob, value, reward, done)
             state = next_state
             if done:
                 break
         
-        log_max_eig_dist_and_incidence_rate(env.max_eig_values, env.was_valid_solution, episode)
-
+        best_dist, best_state = best_setup
+        if episode % 10 == 0:
+            evaluate_and_log_best_setup(env, best_state, best_dist, self.n_eval_samples_in_episode, episode)
 
         trajectory = buf.to_tensors()
         buf.clear()
