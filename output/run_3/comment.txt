@@ -1,2 +1,0 @@
-Here I implemented new environemnt KineticEnvStateless
-Ended before 100 episodes due to bad rewards

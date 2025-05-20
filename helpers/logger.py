@@ -3,9 +3,9 @@ from omegaconf import OmegaConf, DictConfig
 import wandb
 
 
-def get_logger(cfg: DictConfig):
+def get_wandb_run(cfg: DictConfig):
     os.makedirs(cfg.paths.output_dir, exist_ok=True)
-    logger = wandb.init(
+    run = wandb.init(
         project=cfg.logger.project,
         entity=cfg.logger.entity,
         config=OmegaConf.to_container(cfg, resolve=True),
@@ -13,4 +13,8 @@ def get_logger(cfg: DictConfig):
         dir=cfg.paths.output_dir,
     )
 
-    return logger
+    run.define_metric(name="ppo/*", step_metric="global_step")
+    run.define_metric(name="optim/*", step_metric="global_step")
+    run.define_metric(name="reward/*", step_metric="episode")
+    run.define_metric(name="episode/*", step_metric="env_step")
+    return run

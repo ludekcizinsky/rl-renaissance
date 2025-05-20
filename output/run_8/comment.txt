@@ -1,2 +1,0 @@
-Learnable std; best model so far
-Incidence 95%

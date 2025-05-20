@@ -4,8 +4,10 @@ import torch.optim as optim
 
 from helpers.buffers import TrajectoryBuffer
 from helpers.env import KineticEnv
-
+from helpers.utils import compute_grad_norm, log_max_eig_dist_and_incidence_rate
+from helpers.lr_schedulers import get_lr_scheduler
 from typing import Dict
+
 
 class PolicyNetwork(nn.Module):
     def __init__(self, cfg):
@@ -69,47 +71,77 @@ class ValueNetwork(nn.Module):
         return value.squeeze()
 
 class PPOAgent:
-    def __init__(self, cfg, logger):
+    def __init__(self, cfg, run):
 
         self.cfg = cfg
-        self.logger = logger
+        self.run = run
+        self.device = torch.device(cfg.device)
 
-        self.policy_net = PolicyNetwork(cfg)
-        self.value_net = ValueNetwork(cfg)
+        self.policy_net = PolicyNetwork(cfg).to(self.device)
+        self.value_net = ValueNetwork(cfg).to(self.device)
         self.policy_optimizer = optim.AdamW(self.policy_net.parameters(), lr=cfg.method.actor_lr)
         self.value_optimizer = optim.AdamW(self.value_net.parameters(), lr=cfg.method.critic_lr)
 
-    def collect_trajectory(self, env: KineticEnv):
+        self.policy_scheduler = get_lr_scheduler(cfg, self.policy_optimizer)
+        self.value_scheduler = get_lr_scheduler(cfg, self.value_optimizer)
+
+        self.global_step = 0
+
+    def _take_action_and_step(self, env, state, dist):
+        """
+        Sample once and take a step.
+        """
+
+        action = dist.rsample()
+        log_prob = dist.log_prob(action).sum()
+        value = self.value_net(state)
+
+        next_state, sample_reward, _ = env.step(action)
+        next_state = next_state.to(self.device)
+
+        return action, log_prob, value, next_state, sample_reward
+
+    def _get_last_step_results(self, env, state, dist):
+        """
+        Sample multiple times and aggregate the results using mean.
+        """
+        last_step_buffer = TrajectoryBuffer()
+        for _ in range(self.cfg.training.n_dist_samples):
+            results = self._take_action_and_step(env, state, dist)
+            i_action, i_log_prob, i_value, _, i_sample_reward = results
+            last_step_buffer.add_last_step(i_action, i_log_prob, i_value, i_sample_reward)
+        action, log_prob, value, next_state, reward = last_step_buffer.aggregate_last_step()
+        done = True
+
+        return action, log_prob, value, next_state, reward, done
+
+    def collect_trajectory(self, env: KineticEnv, episode: int):
         buf = TrajectoryBuffer()
 
-        state = env.reset()
+        state = env.reset().to(self.device)
         done = False
         for t in range(self.cfg.training.max_steps_per_episode):
             mean, std = self.policy_net(state)
             dist = torch.distributions.Normal(mean, std)
-            reward = 0
+
+            # Special case for last step: sample multiple times and aggregate
             if t == self.cfg.training.max_steps_per_episode - 1:
-                for _ in range(self.cfg.training.n_dist_samples):
-                    action = dist.rsample()
-                    log_prob = dist.log_prob(action).sum()
-                    value = self.value_net(state)
-
-                    next_state, sample_reward, _ = env.step(action)
-
-                    reward += sample_reward/self.cfg.training.n_dist_samples
-                done = True
+                results = self._get_last_step_results(env, state, dist)
+                action, log_prob, value, next_state, reward, done = results
+            
+            # Rest of the steps: sample once
             else:
-                action = dist.rsample()
-                log_prob = dist.log_prob(action).sum()
-                value = self.value_net(state)
-
-                next_state, sample_reward, _ = env.step(action)
-
-                # weight intermediete rewards less
+                results = self._take_action_and_step(env, state, dist)
+                action, log_prob, value, next_state, sample_reward = results
                 reward = self.cfg.reward.intermediate_steps_weight * sample_reward
 
             buf.add(state, action, log_prob, value, reward, done)
+            if done:
+                break
             state = next_state
+        
+        log_max_eig_dist_and_incidence_rate(env.max_eig_values, env.was_valid_solution, episode)
+
 
         trajectory = buf.to_tensors()
         buf.clear()
@@ -138,7 +170,7 @@ class PPOAgent:
         gae_lambda = self.cfg.method.gae_lambda
 
         T = rewards.size(0)
-        advantages = torch.zeros_like(rewards)
+        advantages = torch.zeros_like(rewards, device=self.device)
         gae = 0.0
         for t in reversed(range(T)):
             mask = 1.0 - dones[t]   # 0 if episode ended
@@ -158,10 +190,28 @@ class PPOAgent:
         self.policy_optimizer.zero_grad()
         self.value_optimizer.zero_grad()
         loss.backward()
+
+        log_info = {}
+        # --- gradient norms ---
+        log_info["optim/pnet_pre_clip_grad_norm"] = compute_grad_norm(self.policy_net)
         torch.nn.utils.clip_grad_norm_(self.policy_net.parameters(), max_grad_norm)
+        log_info["optim/pnet_post_clip_grad_norm"] = compute_grad_norm(self.policy_net)
+
+        log_info["optim/vnet_pre_clip_grad_norm"] = compute_grad_norm(self.value_net)
         torch.nn.utils.clip_grad_norm_(self.value_net.parameters(), max_grad_norm)
+        log_info["optim/vnet_post_clip_grad_norm"] = compute_grad_norm(self.value_net)
+
+        # --- step policy optimizer & log its LR ---
         self.policy_optimizer.step()
+        self.policy_scheduler.step()
+        log_info["optim/policy_lr"] = self.policy_optimizer.param_groups[0]['lr']
+
+        # --- step value optimizer & log its LR ---
         self.value_optimizer.step()
+        self.value_scheduler.step()
+        log_info["optim/value_lr"] = self.value_optimizer.param_groups[0]['lr']
+
+        return log_info
 
     def update(self, trajectory: Dict[str, torch.Tensor]):
         """
@@ -193,6 +243,7 @@ class PPOAgent:
         for _ in range(self.cfg.training.num_epochs):  
             idxs = torch.randperm(T) # shuffle indices
             for start in range(0, T, self.cfg.training.batch_size):
+                step_log_info = {"global_step": self.global_step}
 
                 # get batch of data
                 batch_idxs = idxs[start : start + self.cfg.training.batch_size]
@@ -206,24 +257,41 @@ class PPOAgent:
                 mean, std = self.policy_net(b_states)
                 dist = torch.distributions.Normal(mean, std)
                 new_logp = dist.log_prob(b_actions).sum(dim=-1)
-                entropy = dist.entropy().sum(dim=-1).mean()
 
                 # ratio for clipped surrogate
                 ratio = torch.exp(new_logp - b_oldlp)
                 surr1 = ratio * b_advs
                 surr2 = torch.clamp(ratio, 1.0 - self.cfg.method.clip_eps, 1.0 + self.cfg.method.clip_eps) * b_advs
+                step_log_info["ppo/advs"] = b_advs.mean().item()
+                step_log_info["ppo/per_dim_ratio"] = torch.exp((new_logp - b_oldlp) / self.cfg.env.p_size).mean().item()
+                step_log_info["ppo/surr1"] = surr1.mean().item()
+                step_log_info["ppo/surr2"] = surr2.mean().item()
+
+                # policy loss
                 policy_loss = -torch.min(surr1, surr2).mean()
+                step_log_info["ppo/policy_loss"] = policy_loss.item()
 
                 # value loss
                 new_values = self.value_net(b_states).squeeze(-1)
                 value_loss = (b_returns - new_values).pow(2).mean()
+                step_log_info["ppo/value_loss"] = value_loss.item()
+
+                # penalty for log std
+                pnet_log_std_penalty = 1e-3 * (self.policy_net.log_std**2).sum()
+                step_log_info["ppo/pnet_log_std_penalty"] = pnet_log_std_penalty.item()
 
                 # combined loss
                 loss = policy_loss \
                      + self.cfg.method.value_loss_weight * value_loss \
-                     - self.cfg.method.entropy_loss_weight * entropy
+                     + pnet_log_std_penalty
+                step_log_info["ppo/loss"] = loss.item()
 
                 # optimize
-                self._optimize_policy(loss, self.cfg.training.max_grad_norm)
+                optim_log_info = self._optimize_policy(loss, self.cfg.training.max_grad_norm)
+                step_log_info.update(optim_log_info)
 
-        return policy_loss.item(), value_loss.item(), entropy.item()
+                # log
+                self.run.log(step_log_info)
+                self.global_step += 1
+
+        return policy_loss.item(), value_loss.item()
