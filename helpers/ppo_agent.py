@@ -3,6 +3,9 @@ import torch.nn as nn
 import torch.optim as optim
 
 from helpers.buffers import TrajectoryBuffer
+from helpers.env import KineticEnv, BatchKineticEnv
+
+from typing import Dict, List
 from helpers.env import KineticEnv
 from helpers.utils import compute_grad_norm, log_max_eig_dist_and_incidence_rate
 from helpers.lr_schedulers import get_lr_scheduler
@@ -67,7 +70,7 @@ class PPOAgent:
 
         self.cfg = cfg
         self.run = run
-        self.device = torch.device(cfg.device)
+        self.device = torch.device(cfg.device) if torch.cuda.is_available() else torch.device("cpu")
 
         self.policy_net = PolicyNetwork(cfg).to(self.device)
         self.value_net = ValueNetwork(cfg).to(self.device)
@@ -83,13 +86,12 @@ class PPOAgent:
         buf = TrajectoryBuffer()
 
         state = env.reset().to(self.device)
-        for _ in range(self.cfg.training.max_steps_per_episode):
+        for step in range(self.cfg.training.max_steps_per_episode):
             mean, std = self.policy_net(state)
             dist = torch.distributions.Normal(mean, std)
             action = dist.rsample()
             log_prob = dist.log_prob(action).sum()
             value = self.value_net(state)
-
             next_state, reward, done = env.step(action)
             next_state = next_state.to(self.device)
 
@@ -104,6 +106,40 @@ class PPOAgent:
         trajectory = buf.to_tensors()
         buf.clear()
         return trajectory
+    
+    def collect_batch_trajectory(self, env: BatchKineticEnv):
+        print("[PPOAgent] Starting collect_batch_trajectory (batch env)")
+        buf = TrajectoryBuffer()
+        state = env.reset()  # (batch_size, param_dim)
+        print(f"[PPOAgent] Initial batch state: {state.shape}")
+        batch_size = state.shape[0]
+        for step in range(self.cfg.training.max_steps_per_episode):
+            mean, std = self.policy_net(state)
+            dist = torch.distributions.Normal(mean, std)
+            action = dist.rsample()
+            log_prob = dist.log_prob(action).sum(dim=1)  # sum over param_dim
+            value = self.value_net(state)
+            next_state, reward, done = env.step(action)
+            buf.add(state, action, log_prob, value, reward, done)
+            print(f"[PPOAgent] Step {step}: reward (batch) mean={reward.mean().item():.4f}, done sum={done.sum().item()}")
+            state = next_state
+        trajectory = buf.to_tensors()
+        print(f"[PPOAgent] Batch trajectory collected: states={trajectory['states'].shape}, rewards={trajectory['rewards'].shape}")
+        buf.clear()
+        return trajectory
+
+    def collect_trajectories(self, env, num_trajectories: int):
+        print(f"[PPOAgent] collect_trajectories: env={type(env).__name__}, num_trajectories={num_trajectories}")
+        if isinstance(env, BatchKineticEnv):
+            print("[PPOAgent] Using batch environment (BatchKineticEnv)")
+            return self.collect_batch_trajectory(env)
+        else:
+            trajectories = []
+            for i in range(num_trajectories):
+                print(f"[PPOAgent] Collecting trajectory {i+1}/{num_trajectories}")
+                trajectory = self.collect_trajectory(env)
+                trajectories.append(trajectory)
+            return trajectories
 
     def compute_advantages(self, rewards, values, dones, last_value):
         """
@@ -131,7 +167,7 @@ class PPOAgent:
         advantages = torch.zeros_like(rewards, device=self.device)
         gae = 0.0
         for t in reversed(range(T)):
-            mask = 1.0 - dones[t]   # 0 if episode ended
+            mask = 1.0 - dones[t].float()   # 0 if episode ended
             next_val = values[t+1] if t+1 < T else last_value
 
             # d_t = r_t + \gamma*V(s_t+1) - V(s_t)
@@ -171,29 +207,43 @@ class PPOAgent:
 
         return log_info
 
-    def update(self, trajectory: Dict[str, torch.Tensor]):
+    def update(self, trajectories: List[Dict[str, torch.Tensor]]):
         """
         Runs multiple PPO epochs over the data.
-
         Args:
             trajectory: dict from buf.to_tensors()
         """
+        print(f"[PPOAgent] update: {len(trajectories['rewards'])} trajectories")
 
         # unpack trajectory
-        states = trajectory["states"] # (T, p_size)
-        actions = trajectory["actions"] # (T, p_size)
-        old_logp = trajectory["log_probs"] # (T,)
-        values = trajectory["values"].squeeze(-1) # (T,)
-        rewards = trajectory["rewards"] # (T,)
-        dones = trajectory["dones"] # (T,)
-
+        states = trajectories["states"] # (T, p_size)
+        actions = trajectories["actions"] # (T, p_size)
+        old_logp = trajectories["log_probs"] # (T,)
+        values = trajectories["values"].squeeze(-1) # (T,)
+        rewards = trajectories["rewards"] # (T,)
+        dones = trajectories["dones"] # (T,)
+        print(f"[PPOAgent] update: states={states.shape}, actions={actions.shape}, rewards={rewards.shape}")
+        # --- flatten for batch envs (BatchKineticEnv) ---
+        # If states/actions are 3D (steps, batch, param_dim), flatten to (steps*batch, param_dim)
+        if len(states.shape) == 3:
+            steps, batch, param_dim = states.shape
+            states = states.reshape(-1, param_dim)
+            actions = actions.reshape(-1, param_dim)
+            old_logp = old_logp.reshape(-1)
+            values = values.reshape(-1)
+            rewards = rewards.reshape(-1)
+            dones = dones.reshape(-1)
         # normalize rewards
         rewards = (rewards - rewards.mean()) / (rewards.std(unbiased=False) + 1e-8)
-
-        # compute advantages & returns
+        # Compute advantages & returns for the whole batch
         with torch.no_grad():
-            last_value = self.value_net(states[-1]).item()
-        advs, returns = self.compute_advantages(rewards, values, dones, last_value)
+            last_value = self.value_net(states[-1])
+        advs, returns = self.compute_advantages(
+            rewards,
+            values,
+            dones,
+            last_value
+        )
         advs = (advs - advs.mean()) / (advs.std(unbiased=False) + 1e-8)
 
         # train policy and value network from the collected trajectory
@@ -202,16 +252,13 @@ class PPOAgent:
             idxs = torch.randperm(T) # shuffle indices
             for start in range(0, T, self.cfg.training.batch_size):
                 step_log_info = {"global_step": self.global_step}
-
                 # get batch of data
                 batch_idxs = idxs[start : start + self.cfg.training.batch_size]
-                b_states  = states[batch_idxs] # (batch_size, p_size)
-                b_actions = actions[batch_idxs] # (batch_size, p_size)
-                b_oldlp   = old_logp[batch_idxs] # (batch_size,)
-                b_advs    = advs[batch_idxs] # (batch_size,)
-                b_returns = returns[batch_idxs] # (batch_size,)
-
-                # policy forward
+                b_states  = states[batch_idxs]
+                b_actions = actions[batch_idxs]
+                b_oldlp   = old_logp[batch_idxs]
+                b_advs    = advs[batch_idxs]
+                b_returns = returns[batch_idxs]
                 mean, std = self.policy_net(b_states)
                 dist = torch.distributions.Normal(mean, std)
                 new_logp = dist.log_prob(b_actions).sum(dim=-1)

@@ -41,7 +41,7 @@ env:
 
 training:
   num_episodes: 100
-  max_steps_per_episode: 50
+  max_steps_per_episode: 10
   batch_size: 25
   num_epochs: 10
   max_grad_norm: 0.5
