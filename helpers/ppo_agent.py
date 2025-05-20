@@ -6,7 +6,7 @@ import math
 
 from helpers.buffers import TrajectoryBuffer
 from helpers.env import KineticEnv
-from helpers.utils import compute_grad_norm, evaluate_and_log_best_setup
+from helpers.utils import compute_grad_norm, evaluate_and_log_best_setup, log_rl_models
 from helpers.lr_schedulers import get_lr_scheduler
 from typing import Dict
 
@@ -79,6 +79,8 @@ class PPOAgent:
         self.value_scheduler = get_lr_scheduler(cfg, self.value_optimizer)
 
         self.global_step = 0
+        self.global_best_reward = -math.inf
+        self.global_best_model = None
 
     def collect_trajectory(self, env: KineticEnv, episode: int):
         buf = TrajectoryBuffer()
@@ -109,6 +111,11 @@ class PPOAgent:
         best_dist, best_state = best_setup
         if episode % 10 == 0:
             evaluate_and_log_best_setup(env, best_state, best_dist, self.n_eval_samples_in_episode, episode)
+
+        if best_reward > self.global_best_reward:
+            self.global_best_reward = best_reward
+            self.global_best_model = (self.policy_net.state_dict(), self.value_net.state_dict())
+            print(f"FYI: New global best reward: {self.global_best_reward} in episode {episode}.")
 
         trajectory = buf.to_tensors()
         buf.clear()

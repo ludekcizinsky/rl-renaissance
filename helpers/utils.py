@@ -166,16 +166,23 @@ def log_reward_distribution(rewards, episode: int):
     ax.set_title("Smoothed density of reward")
     fig.tight_layout()
 
+    # Calculate reward statistics
+    reward_mean = np.mean(data)
+    reward_std = np.std(data)
+    reward_max = np.max(data)
     wandb.log({
         "reward/distribution": wandb.Image(fig), 
+        "reward/mean": reward_mean,
+        "reward/std": reward_std,
+        "reward/max": reward_max,
         "episode": episode
     })
     plt.close(fig)
 
 
 def log_rl_models(
-    policy_net: torch.nn.Module,
-    value_net:  torch.nn.Module,
+    policy_net_dict: dict,
+    value_net_dict: dict,
     description:   str = "Trained policy and value networks",
     save_dir:      str = ".",
 ):
@@ -198,8 +205,8 @@ def log_rl_models(
     value_path  = os.path.join(save_dir, "value.pt")
 
     # Save state_dicts
-    torch.save(policy_net.state_dict(), policy_path)
-    torch.save(value_net.state_dict(),  value_path)
+    torch.save(policy_net_dict, policy_path)
+    torch.save(value_net_dict,  value_path)
 
     # Build and log the Artifact
     artifact = wandb.Artifact(
