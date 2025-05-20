@@ -44,11 +44,12 @@ def train(cfg: DictConfig):
     ppo_agent = PPOAgent(cfg, run)
    
     # Training loop
-    for episode in range(cfg.training.num_episodes):
-        # Collect trajectory
-        trajectories = ppo_agent.collect_trajectories(env, episode)
-        rewards = trajectories["rewards"]
-        rewards = rewards.cpu().numpy().mean(axis=1)
+    try:
+        for episode in range(cfg.training.num_episodes):
+            # Collect trajectory
+            trajectories = ppo_agent.collect_trajectories(env, episode)
+            rewards = trajectories["rewards"]
+            rewards = rewards.cpu().numpy().mean(axis=1)
 
         print("Mean episode rewards over steps: ", rewards)
         log_reward_distribution(rewards, episode)
@@ -56,9 +57,18 @@ def train(cfg: DictConfig):
         # Update PPO agent
         ppo_agent.update(trajectories)
 
-    # Log models
-    if cfg.training.save_trained_models:
-        log_rl_models(ppo_agent.policy_net, ppo_agent.value_net, save_dir=cfg.paths.output_dir)
+
+        # Log models
+        if cfg.training.save_trained_models:
+            log_rl_models(ppo_agent.policy_net, ppo_agent.value_net, save_dir=cfg.paths.output_dir)
+    except Exception as e:
+        print(f"Error: {e}")
+        print(f"Traceback: {e.__traceback__}")
+        print("-" * 50)
+
+    
+    # Finish wandb run
+    run.finish()
 
     run.finish()
 

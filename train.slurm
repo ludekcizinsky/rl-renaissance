@@ -1,24 +1,36 @@
 #!/bin/bash
 #SBATCH --job-name=rl_base
-#SBATCH --output=outputs/slurm/%x.%j.out       # Save output to logs with job ID
-#SBATCH --error=outputs/slurm/%x.%j.err       # Save errors to separate file
-#SBATCH --time=01:00:00                  # Max runtime (hh:mm:ss)
-#SBATCH --partition=gpu                  # Partition name (adjust if needed)
-#SBATCH --gres=gpu:1                     # Number of GPUs
-#SBATCH --cpus-per-task=20                # Adjust CPU count if needed
-#SBATCH --mem=32G                        # RAM requested
-#SBATCH --ntasks=1                       # Number of tasks
+#SBATCH --output=outputs/slurm/%x.%j.out
+#SBATCH --error=outputs/slurm/%x.%j.err
+#SBATCH --time=00:10:00
+#SBATCH --partition=gpu
+#SBATCH --gres=gpu:1
+#SBATCH --cpus-per-task=20
+#SBATCH --mem=32G
+#SBATCH --ntasks=1
 #SBATCH --account=master
 
 USER=$1
-
 cd /home/$USER/rl-gen-of-kinetic-models/
-apptainer shell --nv --bind "$(pwd)":/home/renaissance/work --bind "/scratch/izar/$USER/rl-for-kinetics/output:/home/renaissance/output" /scratch/izar/$USER/images/renaissance_with_ml.sif
+
+# make sure the output directory exists
+mkdir -p /scratch/izar/$USER/rl-for-kinetics/outputs
+mkdir -p /scratch/izar/$USER/rl-for-kinetics/outputs/slurm
+
+apptainer shell \
+  --nv \
+  --bind "$(pwd)":/home/renaissance/work \
+  --bind "/scratch/izar/$USER/rl-for-kinetics/output":/home/renaissance/output \
+  /scratch/izar/$USER/images/renaissance_with_ml.sif << 'EOF'
 export LC_ALL=C.UTF-8
 export LANG=C.UTF-8
-
 nvidia-smi
 
-# Run your training script
-python train.py
-# python train.py 'logger.tags=[dev]'
+# Example usage (supports multiple experiments)
+# python train.py training.num_episodes=10 'logger.tags=[dev]'
+# python train.py training.num_episodes=10 'logger.tags=[dev]' lr_scheduler=constant
+# python train.py training.num_episodes=10 'logger.tags=[dev]' lr_scheduler=linear_decay
+
+# Your script here
+python train.py training.num_episodes=10 'logger.tags=[dev]'
+EOF

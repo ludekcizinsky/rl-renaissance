@@ -104,4 +104,12 @@ In practice, however, you want to experiment with different configurations. You 
 python train.py method.actor_lr=1e-4 method.latent_dim=256
 ```
 
+### Running with SLURM
 
+For those who have access to Izar, you can run the training with SLURM as follows. First, checkout the `train.slurm` file and adjust it as needed, usually you should change the name of the job, time requested and possibly also the account. Then, specify which configuration you want to use by changing the script at the bottom of the file (see the example usage in the file). Finally, you can submit the job with the following command (change to your izar usernmae):
+
+```bash
+sbatch train.slurm cizinsky
+```
+
+If things go wrong, you can check the output in the `outputs/slurm` directory.
