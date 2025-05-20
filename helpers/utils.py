@@ -151,20 +151,27 @@ def log_reward_distribution(rewards, episode: int):
 
     data = np.asarray(rewards)
 
-    fig, ax = plt.subplots(figsize=(9, 6), dpi=100)
+    try:
+        fig, ax = plt.subplots(figsize=(9, 6), dpi=100)
 
-    kde = gaussian_kde(data, bw_method=0.2)
+        kde = gaussian_kde(data, bw_method=0.2)
 
-    x_min, x_max = data.min() - 1, data.max() + 1
-    x = np.linspace(x_min, x_max, 500)
-    y = kde(x)
+        x_min, x_max = data.min() - 1, data.max() + 1
+        x = np.linspace(x_min, x_max, 500)
+        y = kde(x)
 
-    ax.plot(x, y, lw=2)
-    ax.fill_between(x, y, alpha=0.3)
-    ax.set_xlabel("reward")
-    ax.set_ylabel("density")
-    ax.set_title("Smoothed density of reward")
-    fig.tight_layout()
+        ax.plot(x, y, lw=2)
+        ax.fill_between(x, y, alpha=0.3)
+        ax.set_xlabel("reward")
+        ax.set_ylabel("density")
+        ax.set_title("Smoothed density of reward")
+        fig.tight_layout()
+    except Exception as e:
+        print(f"FYI: Error plotting reward distribution: {e}, using empty plot instead.")
+        fig, ax = plt.subplots(figsize=(9, 6), dpi=100)
+        ax.set_title("Empty plot due to error computing KDE.")
+        fig.tight_layout()
+
 
     # Calculate reward statistics
     reward_mean = np.mean(data)

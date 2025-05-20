@@ -112,12 +112,13 @@ class PPOAgent:
         if episode % 10 == 0:
             evaluate_and_log_best_setup(env, best_state, best_dist, self.n_eval_samples_in_episode, episode)
 
-        if best_reward > self.global_best_reward:
-            self.global_best_reward = best_reward
+        trajectory = buf.to_tensors()
+        mean_episode_reward = trajectory["rewards"].mean().item()
+        if mean_episode_reward > self.global_best_reward:
+            self.global_best_reward = mean_episode_reward
             self.global_best_model = (self.policy_net.state_dict(), self.value_net.state_dict())
             print(f"FYI: New global best reward: {self.global_best_reward} in episode {episode}.")
 
-        trajectory = buf.to_tensors()
         buf.clear()
         return trajectory
 
