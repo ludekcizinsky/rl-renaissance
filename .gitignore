@@ -190,3 +190,4 @@ renaissance/skimpy
 *.fdb_latexmk
 
 .cache/
+outputs/

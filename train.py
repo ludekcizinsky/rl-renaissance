@@ -56,5 +56,9 @@ def train(cfg: DictConfig):
     if cfg.training.save_trained_models:
         log_rl_models(ppo_agent.policy_net, ppo_agent.value_net, save_dir=cfg.paths.output_dir)
 
+    
+    # Finish wandb run
+    run.finish()
+
 if __name__ == "__main__":
     train()
