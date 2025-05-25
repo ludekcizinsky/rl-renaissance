@@ -1,10 +1,10 @@
 defaults:
   - method: refinement_ppo
-  - lr_scheduler: cosine
+  - lr_scheduler: constant
   - _self_
 
 seed: 42
-device: cuda
+device: cpu
 launch_cmd: null # will be set at runtime dynamically
 
 # for now ignore, we don't use wandb yet
@@ -33,11 +33,10 @@ reward:
   eig_partition: -2.5
 
 env:
-  # Initial mean and std the normal distribution for p0
-  p0_init_mean: 0
-  p0_init_std: 0.1
   # Total number of kinetic parameters
   p_size: 384 
+  # We update next state as x_new = x + action * action_scale
+  action_scale: 1.0
 
 training:
   num_episodes: 100
@@ -46,6 +45,7 @@ training:
   num_epochs: 10
   max_grad_norm: 0.5
   save_trained_models: true
+  n_eval_samples_in_episode: 50
 
 
 # Just to let Hydra know where to save the config file

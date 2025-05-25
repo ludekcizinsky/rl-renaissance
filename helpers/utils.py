@@ -178,31 +178,45 @@ def log_reward_distribution(rewards, episode: int):
 
     data = np.asarray(rewards)
 
-    fig, ax = plt.subplots(figsize=(9, 6), dpi=100)
+    try:
+        fig, ax = plt.subplots(figsize=(9, 6), dpi=100)
 
-    kde = gaussian_kde(data, bw_method=0.2)
+        kde = gaussian_kde(data, bw_method=0.2)
 
-    x_min, x_max = data.min() - 1, data.max() + 1
-    x = np.linspace(x_min, x_max, 500)
-    y = kde(x)
+        x_min, x_max = data.min() - 1, data.max() + 1
+        x = np.linspace(x_min, x_max, 500)
+        y = kde(x)
 
-    ax.plot(x, y, lw=2)
-    ax.fill_between(x, y, alpha=0.3)
-    ax.set_xlabel("reward")
-    ax.set_ylabel("density")
-    ax.set_title("Smoothed density of reward")
-    fig.tight_layout()
+        ax.plot(x, y, lw=2)
+        ax.fill_between(x, y, alpha=0.3)
+        ax.set_xlabel("reward")
+        ax.set_ylabel("density")
+        ax.set_title("Smoothed density of reward")
+        fig.tight_layout()
+    except Exception as e:
+        print(f"FYI: Error plotting reward distribution: {e}, using empty plot instead.")
+        fig, ax = plt.subplots(figsize=(9, 6), dpi=100)
+        ax.set_title("Empty plot due to error computing KDE.")
+        fig.tight_layout()
 
+
+    # Calculate reward statistics
+    reward_mean = np.mean(data)
+    reward_std = np.std(data)
+    reward_max = np.max(data)
     wandb.log({
         "reward/distribution": wandb.Image(fig), 
+        "reward/mean": reward_mean,
+        "reward/std": reward_std,
+        "reward/max": reward_max,
         "episode": episode
     })
     plt.close(fig)
 
 
 def log_rl_models(
-    policy_net: torch.nn.Module,
-    value_net:  torch.nn.Module,
+    policy_net_dict: dict,
+    value_net_dict: dict,
     description:   str = "Trained policy and value networks",
     save_dir:      str = ".",
 ):
@@ -225,8 +239,8 @@ def log_rl_models(
     value_path  = os.path.join(save_dir, "value.pt")
 
     # Save state_dicts
-    torch.save(policy_net.state_dict(), policy_path)
-    torch.save(value_net.state_dict(),  value_path)
+    torch.save(policy_net_dict, policy_path)
+    torch.save(value_net_dict,  value_path)
 
     # Build and log the Artifact
     artifact = wandb.Artifact(
@@ -240,3 +254,26 @@ def log_rl_models(
     wandb.log_artifact(artifact, aliases=["latest"])
 
     print(f"FYI: Logged model to W&B as {run_name}.")
+
+
+def evaluate_and_log_best_setup(env, state, dist, n_samples, episode):
+
+    all_max_eigs = []
+    is_valid_solution = []
+
+    state = state.to("cpu")
+    for _ in range(n_samples):
+        # sample action and get next state accordingly
+        action = dist.rsample()
+        action = action.to("cpu")
+        action = env.action_scale * action
+        next_state = (state + action).clamp(min=env.min_val, max=env.max_val)
+
+        # compute max eigenvalue
+        _, all_eigenvalues = env.reward_fn(next_state)
+        max_eig = np.max(all_eigenvalues)
+        all_max_eigs.append(max_eig)
+        is_valid_solution.append(max_eig < env.eig_cutoff)
+
+
+    log_max_eig_dist_and_incidence_rate(all_max_eigs, is_valid_solution, episode)

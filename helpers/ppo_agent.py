@@ -1,13 +1,15 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import numpy as np
+import math
 
 from helpers.buffers import TrajectoryBuffer
 from helpers.env import KineticEnv, BatchKineticEnv
 
 from typing import Dict, List
 from helpers.env import KineticEnv
-from helpers.utils import compute_grad_norm, log_max_eig_dist_and_incidence_rate
+from helpers.utils import compute_grad_norm, evaluate_and_log_best_setup, log_rl_models
 from helpers.lr_schedulers import get_lr_scheduler
 from typing import Dict
 
@@ -17,34 +19,32 @@ class PolicyNetwork(nn.Module):
         super().__init__()
 
         self.cfg = cfg
-        hidden_dim = 4*cfg.env.p_size
-        self.net = nn.Sequential(
+        hidden_dim = 4 * cfg.env.p_size
+        # Shared base network
+        self.base = nn.Sequential(
             nn.Linear(cfg.env.p_size, hidden_dim),
             nn.LayerNorm(hidden_dim),
             nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim),
             nn.LayerNorm(hidden_dim),
-            nn.ReLU(),
+            nn.ReLU()
+        )
+        # Separate heads for mean and log_std
+        self.mean_head = nn.Sequential(
+            nn.Linear(hidden_dim, cfg.env.p_size),
+            nn.LayerNorm(cfg.env.p_size)
+        )
+        self.log_std_head = nn.Sequential(
             nn.Linear(hidden_dim, cfg.env.p_size),
             nn.LayerNorm(cfg.env.p_size)
         )
 
-        self.log_std = nn.Parameter(torch.full((cfg.env.p_size,), -0.5))
-
-    def bound_action(self, action):
-        action = torch.clamp(action, self.cfg.constraints.min_km, self.cfg.constraints.max_km)
-        return action
-
     def forward(self, x):
-        mean = self.net(x)
-        std = torch.exp(self.log_std)
+        base_out = self.base(x)
+        mean = self.mean_head(base_out)
+        log_std = self.log_std_head(base_out)
+        std = torch.exp(log_std)
         return mean, std
-
-    def get_action(self, state):
-        mean, std = self.forward(state)
-        action = torch.normal(mean, std)
-        action = self.bound_action(action)
-        return action
 
 class ValueNetwork(nn.Module):
     def __init__(self, cfg):
@@ -70,7 +70,8 @@ class PPOAgent:
 
         self.cfg = cfg
         self.run = run
-        self.device = torch.device(cfg.device) if torch.cuda.is_available() else torch.device("cpu")
+        self.n_eval_samples_in_episode = cfg.training.n_eval_samples_in_episode
+        self.device = torch.device(cfg.device)
 
         self.policy_net = PolicyNetwork(cfg).to(self.device)
         self.value_net = ValueNetwork(cfg).to(self.device)
@@ -81,29 +82,45 @@ class PPOAgent:
         self.value_scheduler = get_lr_scheduler(cfg, self.value_optimizer)
 
         self.global_step = 0
+        self.global_best_reward = -math.inf
+        self.global_best_model = None
 
     def collect_trajectory(self, env: KineticEnv, episode: int):
         buf = TrajectoryBuffer()
+        best_setup = None
+        best_reward = -math.inf
 
         state = env.reset().to(self.device)
         for step in range(self.cfg.training.max_steps_per_episode):
             mean, std = self.policy_net(state)
             dist = torch.distributions.Normal(mean, std)
+
             action = dist.rsample()
             log_prob = dist.log_prob(action).sum()
             value = self.value_net(state)
             next_state, reward, done = env.step(action)
             next_state = next_state.to(self.device)
 
+            if best_setup is None or reward > best_reward:
+                best_setup = (dist, state)
+                best_reward = reward
+
             buf.add(state, action, log_prob, value, reward, done)
             state = next_state
             if done:
                 break
         
-        log_max_eig_dist_and_incidence_rate(env.max_eig_values, env.was_valid_solution, episode)
-
+        best_dist, best_state = best_setup
+        if episode % 10 == 0:
+            evaluate_and_log_best_setup(env, best_state, best_dist, self.n_eval_samples_in_episode, episode)
 
         trajectory = buf.to_tensors()
+        mean_episode_reward = trajectory["rewards"].mean().item()
+        if mean_episode_reward > self.global_best_reward:
+            self.global_best_reward = mean_episode_reward
+            self.global_best_model = (self.policy_net.state_dict(), self.value_net.state_dict())
+            print(f"FYI: New global best reward: {self.global_best_reward} in episode {episode}.")
+
         buf.clear()
         return trajectory
     
@@ -281,14 +298,9 @@ class PPOAgent:
                 value_loss = (b_returns - new_values).pow(2).mean()
                 step_log_info["ppo/value_loss"] = value_loss.item()
 
-                # penalty for log std
-                pnet_log_std_penalty = 1e-3 * (self.policy_net.log_std**2).sum()
-                step_log_info["ppo/pnet_log_std_penalty"] = pnet_log_std_penalty.item()
-
                 # combined loss
                 loss = policy_loss \
-                     + self.cfg.method.value_loss_weight * value_loss \
-                     + pnet_log_std_penalty
+                     + self.cfg.method.value_loss_weight * value_loss
                 step_log_info["ppo/loss"] = loss.item()
 
                 # optimize

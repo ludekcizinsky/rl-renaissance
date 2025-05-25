@@ -1,5 +1,7 @@
 from collections import defaultdict
 import torch
+import numpy as np
+
 
 class TrajectoryBuffer:
     def __init__(self):
@@ -23,8 +25,10 @@ class TrajectoryBuffer:
                 out[key] = torch.stack(seq).detach()
             else:
                 # tensorify numeric types (e.g. rewards, dones, raw states)
-                out[key] = torch.tensor(seq, dtype=torch.float32).detach()
+                arr = np.array(seq)
+                out[key] = torch.tensor(arr, dtype=torch.float32).detach()
         return out
+    
 
     def clear(self):
         """Reset the buffer for a new trajectory."""
