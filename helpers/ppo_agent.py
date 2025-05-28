@@ -36,11 +36,14 @@ class PolicyNetwork(nn.Module):
             nn.LayerNorm(cfg.env.p_size)
         )
 
+        self.min_log_std = getattr(cfg.method, "min_log_std", -20)
+        self.max_log_std = getattr(cfg.method, "max_log_std", 2)
+
     def forward(self, x):
         base_out = self.base(x)
         mean = self.mean_head(base_out)
         log_std = self.log_std_head(base_out)
-        log_std = torch.clamp(log_std, min=-20, max=2)
+        log_std = torch.clamp(log_std, min=self.min_log_std, max=self.max_log_std)
         std = torch.exp(log_std)
         return mean, std
 
