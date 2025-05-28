@@ -85,14 +85,18 @@ class PPOAgent:
         self.global_step = 0
         self.global_best_reward = -math.inf
         self.global_best_model = None
+        self.global_best_setup = None
+
 
     def collect_trajectory(self, env: KineticEnv, episode: int):
         buf = TrajectoryBuffer()
         best_setup = None
         best_reward = -math.inf
+        best_step = None
 
         state = env.reset().to(self.device)
-        for _ in range(self.cfg.training.max_steps_per_episode):
+        for step in range(self.cfg.training.max_steps_per_episode):
+
             mean, std = self.policy_net(state)
             dist = torch.distributions.Normal(mean, std)
 
@@ -104,24 +108,26 @@ class PPOAgent:
             next_state = next_state.to(self.device)
 
             if best_setup is None or reward > best_reward:
-                best_setup = (dist, state)
+                best_setup = (dist, state, mean, std)
                 best_reward = reward
+                best_step = step
 
             buf.add(state, action, log_prob, value, reward, done)
             state = next_state
             if done:
                 break
         
-        best_dist, best_state = best_setup
+        best_dist, best_state, best_mean, best_std = best_setup
         if episode % 10 == 0:
             evaluate_and_log_best_setup(env, best_state, best_dist, self.n_eval_samples_in_episode, episode)
 
         trajectory = buf.to_tensors()
-        mean_episode_reward = trajectory["rewards"].mean().item()
-        if mean_episode_reward > self.global_best_reward:
-            self.global_best_reward = mean_episode_reward
+        max_episode_reward = trajectory["rewards"].max().item()
+        if max_episode_reward > self.global_best_reward:
+            self.global_best_reward = max_episode_reward
             self.global_best_model = (self.policy_net.state_dict(), self.value_net.state_dict())
-            print(f"FYI: New global best reward: {self.global_best_reward} in episode {episode}.")
+            self.global_best_setup = (best_mean, best_std, best_state, best_step, episode)
+            print(f"FYI: New global best reward: {self.global_best_reward} in episode {episode} at step {best_step}.")
 
         buf.clear()
         return trajectory

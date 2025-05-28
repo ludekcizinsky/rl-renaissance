@@ -8,10 +8,12 @@ from helpers.jacobian_solver import check_jacobian
 
 from helpers.ppo_agent import PPOAgent
 from helpers.env import KineticEnv
-from helpers.utils import reward_func, load_pkl, log_rl_models, log_reward_distribution
+from helpers.utils import reward_func, load_pkl, log_rl_models, log_reward_distribution, log_best_setup
 from helpers.logger import get_wandb_run
 
 import logging
+
+from tqdm import tqdm
 
 import traceback
 
@@ -46,7 +48,7 @@ def train(cfg: DictConfig):
    
     # Training loop
     try:
-        for episode in range(cfg.training.num_episodes):
+        for episode in tqdm(range(cfg.training.num_episodes), desc="Training"):
             # Collect trajectory
             trajectory = ppo_agent.collect_trajectory(env, episode)
             rewards = trajectory["rewards"]
@@ -59,6 +61,10 @@ def train(cfg: DictConfig):
         if cfg.training.save_trained_models:
             policy_net_dict, value_net_dict = ppo_agent.global_best_model
             log_rl_models(policy_net_dict, value_net_dict, save_dir=cfg.paths.output_dir)
+
+            best_mean, best_std, best_state, best_step, episode = ppo_agent.global_best_setup
+            log_best_setup(best_mean, best_std, best_state, best_step, episode, save_dir=cfg.paths.output_dir)
+
     except Exception as e:
         print(f"Error: {e}")
         print(f"Traceback: {traceback.format_exc()}")

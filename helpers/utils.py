@@ -236,6 +236,35 @@ def log_rl_models(
     print(f"FYI: Logged model to W&B as {run_name}.")
 
 
+def log_best_setup(best_mean, best_std, best_state, best_step, episode, save_dir):
+
+    # Prepare the file paths to save the best setup
+    run_name = wandb.run.name
+    save_dir = os.path.join(save_dir, run_name)
+    os.makedirs(save_dir, exist_ok=True)
+    file_name = f"best_setup_e{episode}_s{best_step}.pt"
+    file_path = os.path.join(save_dir, file_name)
+
+    # Bundle into one dict and save
+    bundle = {
+        "best_state": best_state,
+        "best_mean": best_mean,
+        "best_std": best_std,
+    }
+    torch.save(bundle, file_path)
+
+    # Create & log the artifact
+    artifact = wandb.Artifact(
+        name=file_name,
+        type="model",
+        description="Best setup inference setup"
+    )
+    artifact.add_file(file_path)
+    wandb.log_artifact(artifact, aliases=["best"])
+
+    print(f"FYI: Logged best setup to W&B as {file_name}.")
+
+
 def evaluate_best_setup(env, state, dist, n_samples):
 
     all_max_eigs = []
@@ -260,7 +289,7 @@ def evaluate_best_setup(env, state, dist, n_samples):
 
 def evaluate_and_log_best_setup(env, state, dist, n_samples, episode):
 
-    all_max_eigs, is_valid_solution = evaluate_best_setup(env, state, dist, n_samples, episode)
+    all_max_eigs, is_valid_solution = evaluate_best_setup(env, state, dist, n_samples)
     log_max_eig_dist_and_incidence_rate(all_max_eigs, is_valid_solution, episode)
 
 
