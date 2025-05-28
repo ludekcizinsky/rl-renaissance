@@ -286,7 +286,6 @@ def log_summary_metrics(env, setup, num_samples=500, section="best_setup"):
     wandb.run.summary[f"{section}/max_eigs_median"] = np.median(all_max_eigs)
     wandb.run.summary[f"{section}/episode"] = best_episode
     wandb.run.summary[f"{section}/step"] = best_step
-    wandb.run.summary.update()
 
 
 def evaluate_best_setup(env, state, dist, n_samples):

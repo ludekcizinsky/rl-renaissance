@@ -6,7 +6,7 @@ import math
 
 from helpers.buffers import TrajectoryBuffer
 from helpers.env import KineticEnv
-from helpers.utils import compute_grad_norm, log_summary_metrics
+from helpers.utils import compute_grad_norm, evaluate_and_log_best_setup, log_summary_metrics
 from helpers.lr_schedulers import get_lr_scheduler
 from typing import Dict
 import wandb
@@ -113,7 +113,7 @@ class PPOAgent:
             next_state = next_state.to(self.device)
 
             if best_setup is None or reward > best_reward:
-                best_setup = (state, mean, std)
+                best_setup = (dist, state, mean, std)
                 best_reward = reward
                 best_step = step
 
@@ -123,7 +123,9 @@ class PPOAgent:
                 break
         
         # Parse best setup
-        best_state, best_mean, best_std = best_setup
+        best_dist, best_state, best_mean, best_std = best_setup
+        if episode % 10 == 0:
+            evaluate_and_log_best_setup(env, best_state, best_dist, self.n_eval_samples_in_episode, episode)
 
         # Global best setup
         trajectory = buf.to_tensors()
