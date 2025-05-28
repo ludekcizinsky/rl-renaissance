@@ -81,7 +81,6 @@ reward_flag = int(configs['REWARDS']['reward_flag'])
 eig_partition = float(configs['REWARDS']['eig_partition'])
 n_consider = int(configs['REWARDS']['n_consider'])
 
-pf_flag = int(configs['PARAMETER_FIXING']['pf_flag'])
 
 # Call solvers from SKimPy
 chk_jcbn = check_jacobian()
@@ -94,9 +93,8 @@ chk_jcbn._load_ssprofile(met_model, 'fdp1', ss_idx)  ## Integrate steady state i
 
 print('--- Begin evolution strategy')
 for rep in range(repeats):
-    cond_class = 1
     # Call neural network agent
-    mlp = MLP(cond_class, lnminkm, lnmaxkm, n_samples, names_km, param_fixing=pf_flag)
+    mlp = MLP(lnminkm, lnmaxkm, n_samples, names_km)
     init_dict = mlp.generator.get_weights()
 
     this_savepath = f'{output_path}/repeat_{rep}/'
