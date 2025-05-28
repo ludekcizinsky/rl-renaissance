@@ -8,7 +8,7 @@ from helpers.jacobian_solver import check_jacobian
 
 from helpers.ppo_agent import PPOAgent
 from helpers.env import KineticEnv
-from helpers.utils import reward_func, load_pkl, log_rl_models, log_reward_distribution
+from helpers.utils import reward_func, load_pkl, log_rl_models, log_reward_distribution, log_summary_metrics
 from helpers.logger import get_wandb_run
 
 import logging
@@ -46,8 +46,8 @@ def train(cfg: DictConfig):
     # Initialize PPO agent (actor and critic)
     ppo_agent = PPOAgent(cfg, run)
    
-    # Training loop
     try:
+        # Training loop
         for episode in tqdm(range(cfg.training.num_episodes), desc="Training"):
             # Collect trajectory
             trajectory = ppo_agent.collect_trajectory(env, episode)
@@ -57,11 +57,14 @@ def train(cfg: DictConfig):
             # Update PPO agent
             ppo_agent.update(trajectory)
 
+        # Summary metrics
+        best_setup = ppo_agent.global_best_setup
+        log_summary_metrics(env, best_setup, section="best_setup")
+
         # Log models
         if cfg.training.save_trained_models:
-            policy_net_dict, value_net_dict = ppo_agent.global_best_model
-            best_setup = ppo_agent.global_best_setup
             first_valid_setup = ppo_agent.first_valid_setup
+            policy_net_dict, value_net_dict = ppo_agent.global_best_model
             log_rl_models(policy_net_dict, value_net_dict, best_setup, first_valid_setup, save_dir=cfg.paths.output_dir)
 
     except Exception as e:

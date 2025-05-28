@@ -6,7 +6,7 @@ import math
 
 from helpers.buffers import TrajectoryBuffer
 from helpers.env import KineticEnv
-from helpers.utils import compute_grad_norm, evaluate_and_log_best_setup, log_rl_models
+from helpers.utils import compute_grad_norm, log_summary_metrics
 from helpers.lr_schedulers import get_lr_scheduler
 from typing import Dict
 import wandb
@@ -113,7 +113,7 @@ class PPOAgent:
             next_state = next_state.to(self.device)
 
             if best_setup is None or reward > best_reward:
-                best_setup = (dist, state, mean, std)
+                best_setup = (state, mean, std)
                 best_reward = reward
                 best_step = step
 
@@ -122,17 +122,10 @@ class PPOAgent:
             if done:
                 break
         
-        best_dist, best_state, best_mean, best_std = best_setup
-        if episode % 10 == 0:
-            evaluate_and_log_best_setup(env, best_state, best_dist, self.n_eval_samples_in_episode, episode)
+        # Parse best setup
+        best_state, best_mean, best_std = best_setup
 
-        wandb.log({
-            "episode": episode,
-            "episode/best_reward": best_reward,
-            "episode/best_step": best_step,
-        })
-
-
+        # Global best setup
         trajectory = buf.to_tensors()
         max_episode_reward = trajectory["rewards"].max().item()
         if max_episode_reward > self.global_best_reward:
@@ -141,9 +134,18 @@ class PPOAgent:
             self.global_best_setup = (best_mean, best_std, best_state, best_step, episode)
             print(f"FYI: New global best reward: {self.global_best_reward} in episode {episode} at step {best_step}.")
 
+        # First valid setup
         if self.first_valid_setup is None and best_reward > 0.5:
             self.first_valid_setup = (best_mean, best_std, best_state, best_step, episode)
+            log_summary_metrics(env, self.first_valid_setup, section="first_valid_setup")
             print(f"FYI: First valid setup found in episode {episode} at step {best_step}.")
+
+        # Log episode metrics
+        self.run.log({
+            "episode": episode,
+            "episode/best_reward": best_reward,
+            "episode/best_step": best_step,
+        })
 
         buf.clear()
         return trajectory

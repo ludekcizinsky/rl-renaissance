@@ -264,6 +264,31 @@ def log_rl_models(
     print(f"FYI: Logged models and best setup to W&B as {run_name}.")
 
 
+def log_summary_metrics(env, setup, num_samples=500, section="best_setup"):
+
+    best_mean, best_std, best_state, best_step, best_episode = setup
+    setup_dict = {
+        "best_mean": best_mean,
+        "best_std": best_std,
+        "best_state": best_state,
+    }
+
+
+    incidence_rate, all_max_eigs = get_incidence_rate(env, setup_dict, num_samples)
+
+    wandb.run.summary[f"{section}/ir"] = incidence_rate
+    wandb.run.summary[f"{section}/all_max_eigs"] = torch.tensor(all_max_eigs)
+    wandb.run.summary[f"{section}/num_samples"] = len(all_max_eigs)
+    wandb.run.summary[f"{section}/max_eigs_mean"] = np.mean(all_max_eigs)
+    wandb.run.summary[f"{section}/max_eigs_min"] = np.min(all_max_eigs)
+    wandb.run.summary[f"{section}/max_eigs_max"] = np.max(all_max_eigs)
+    wandb.run.summary[f"{section}/max_eigs_std"] = np.std(all_max_eigs)
+    wandb.run.summary[f"{section}/max_eigs_median"] = np.median(all_max_eigs)
+    wandb.run.summary[f"{section}/episode"] = best_episode
+    wandb.run.summary[f"{section}/step"] = best_step
+    wandb.run.summary.update()
+
+
 def evaluate_best_setup(env, state, dist, n_samples):
 
     all_max_eigs = []
@@ -292,7 +317,7 @@ def evaluate_and_log_best_setup(env, state, dist, n_samples, episode):
     log_max_eig_dist_and_incidence_rate(all_max_eigs, is_valid_solution, episode)
 
 
-def get_incidence_rate(env, best_setup, num_samples=100, device="cuda"):
+def get_incidence_rate(env, best_setup, num_samples=100):
 
     # Unpack best setup
     best_state = best_setup["best_state"]
