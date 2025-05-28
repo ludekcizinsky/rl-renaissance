@@ -8,7 +8,7 @@ from helpers.jacobian_solver import check_jacobian
 
 from helpers.ppo_agent import PPOAgent
 from helpers.env import KineticEnv
-from helpers.utils import reward_func, load_pkl, log_rl_models, log_reward_distribution, log_best_setup
+from helpers.utils import reward_func, load_pkl, log_rl_models, log_reward_distribution
 from helpers.logger import get_wandb_run
 
 import logging
@@ -60,10 +60,8 @@ def train(cfg: DictConfig):
         # Log models
         if cfg.training.save_trained_models:
             policy_net_dict, value_net_dict = ppo_agent.global_best_model
-            log_rl_models(policy_net_dict, value_net_dict, save_dir=cfg.paths.output_dir)
-
-            best_mean, best_std, best_state, best_step, episode = ppo_agent.global_best_setup
-            log_best_setup(best_mean, best_std, best_state, best_step, episode, save_dir=cfg.paths.output_dir)
+            best_setup = ppo_agent.global_best_setup
+            log_rl_models(policy_net_dict, value_net_dict, best_setup, save_dir=cfg.paths.output_dir)
 
     except Exception as e:
         print(f"Error: {e}")

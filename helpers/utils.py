@@ -197,7 +197,7 @@ def log_reward_distribution(rewards, episode: int):
 def log_rl_models(
     policy_net_dict: dict,
     value_net_dict: dict,
-    description:   str = "Trained policy and value networks",
+    best_setup, 
     save_dir:      str = ".",
 ):
     """
@@ -210,6 +210,8 @@ def log_rl_models(
         save_dir:       Directory where to save temporary .pt files.
     """
 
+    # Unpack best setup
+    best_mean, best_std, best_state, best_step, episode = best_setup
 
     # Prepare file paths
     run_name = wandb.run.name
@@ -217,52 +219,33 @@ def log_rl_models(
     os.makedirs(save_dir, exist_ok=True)
     policy_path = os.path.join(save_dir, "policy.pt")
     value_path  = os.path.join(save_dir, "value.pt")
+    best_path   = os.path.join(save_dir, f"best_setup_e{episode}_s{best_step}.pt")
 
     # Save state_dicts
     torch.save(policy_net_dict, policy_path)
     torch.save(value_net_dict,  value_path)
 
-    # Build and log the Artifact
-    artifact = wandb.Artifact(
-        name=run_name,
-        type="model",
-        description=description
-    )
-    artifact.add_file(policy_path)
-    artifact.add_file(value_path)
-    wandb.log_artifact(artifact)
-    wandb.log_artifact(artifact, aliases=["latest"])
-
-    print(f"FYI: Logged model to W&B as {run_name}.")
-
-
-def log_best_setup(best_mean, best_std, best_state, best_step, episode, save_dir):
-
-    # Prepare the file paths to save the best setup
-    run_name = wandb.run.name
-    save_dir = os.path.join(save_dir, run_name)
-    os.makedirs(save_dir, exist_ok=True)
-    file_name = f"best_setup_e{episode}_s{best_step}.pt"
-    file_path = os.path.join(save_dir, file_name)
-
-    # Bundle into one dict and save
+    # Save best setup
     bundle = {
         "best_state": best_state,
         "best_mean": best_mean,
         "best_std": best_std,
     }
-    torch.save(bundle, file_path)
+    torch.save(bundle, best_path)
 
-    # Create & log the artifact
+    # Build and log the Artifact
     artifact = wandb.Artifact(
-        name=file_name,
+        name=run_name,
         type="model",
-        description="Best setup inference setup"
+        description="Trained policy and value networks + best setup"
     )
-    artifact.add_file(file_path)
+    artifact.add_file(policy_path)
+    artifact.add_file(value_path)
+    artifact.add_file(best_path)
+    wandb.log_artifact(artifact)
     wandb.log_artifact(artifact, aliases=["best"])
 
-    print(f"FYI: Logged best setup to W&B as {file_name}.")
+    print(f"FYI: Logged models and best setup to W&B as {run_name}.")
 
 
 def evaluate_best_setup(env, state, dist, n_samples):
