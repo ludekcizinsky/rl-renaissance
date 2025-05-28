@@ -9,7 +9,7 @@ from helpers.env import KineticEnv
 from helpers.utils import compute_grad_norm, evaluate_and_log_best_setup, log_rl_models
 from helpers.lr_schedulers import get_lr_scheduler
 from typing import Dict
-
+import wandb
 
 class PolicyNetwork(nn.Module):
     def __init__(self, cfg):
@@ -124,6 +124,13 @@ class PPOAgent:
         best_dist, best_state, best_mean, best_std = best_setup
         if episode % 10 == 0:
             evaluate_and_log_best_setup(env, best_state, best_dist, self.n_eval_samples_in_episode, episode)
+
+        wandb.log({
+            "episode": episode,
+            "episode/best_reward": best_reward,
+            "episode/best_step": best_step,
+        })
+
 
         trajectory = buf.to_tensors()
         max_episode_reward = trajectory["rewards"].max().item()
