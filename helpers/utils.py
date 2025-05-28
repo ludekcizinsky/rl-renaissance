@@ -1,14 +1,21 @@
 import os
 import pickle
+import sys
+import logging
+from functools import partial
 from typing import Any
 
 import torch
 import math
 import numpy as np
-from omegaconf import DictConfig
+from omegaconf import DictConfig, OmegaConf
 import matplotlib.pyplot as plt
 from scipy.stats import gaussian_kde
 import wandb
+from tqdm import tqdm
+
+from helpers.jacobian_solver import check_jacobian
+from helpers.env import KineticEnv
 
 def get_timestep_embedding(timestep: int, embedding_dim: int, max_period: float = 10000) -> torch.Tensor:
     """
@@ -229,13 +236,13 @@ def log_rl_models(
     print(f"FYI: Logged model to W&B as {run_name}.")
 
 
-def evaluate_and_log_best_setup(env, state, dist, n_samples, episode):
+def evaluate_best_setup(env, state, dist, n_samples):
 
     all_max_eigs = []
     is_valid_solution = []
 
     state = state.to("cpu")
-    for _ in range(n_samples):
+    for _ in tqdm(range(n_samples), desc="Evaluating best setup"):
         # sample action and get next state accordingly
         action = dist.rsample()
         action = action.to("cpu")
@@ -248,5 +255,64 @@ def evaluate_and_log_best_setup(env, state, dist, n_samples, episode):
         all_max_eigs.append(max_eig)
         is_valid_solution.append(max_eig < env.eig_cutoff)
 
+    return all_max_eigs, is_valid_solution
 
+
+def evaluate_and_log_best_setup(env, state, dist, n_samples, episode):
+
+    all_max_eigs, is_valid_solution = evaluate_best_setup(env, state, dist, n_samples, episode)
     log_max_eig_dist_and_incidence_rate(all_max_eigs, is_valid_solution, episode)
+
+
+def get_incidence_rate(env, policy_net, max_steps_per_episode=50, num_samples=100, device="cuda"):
+
+    # Do one episode and find the best state and action distribution
+    best_setup = None
+    best_reward = -math.inf
+    state = env.reset().to(device)
+    for _ in tqdm(range(max_steps_per_episode), desc="Getting best setup"):
+        mean, std = policy_net(state)
+        dist = torch.distributions.Normal(mean, std)
+
+        action = dist.rsample()
+        next_state, reward, done = env.step(action)
+        next_state = next_state.to(device)
+
+        if best_setup is None or reward > best_reward:
+            best_setup = (dist, state)
+            best_reward = reward
+
+        state = next_state
+        if done:
+            break
+    
+    # Evaluate the best setup
+    best_dist, best_state = best_setup
+    all_max_eigs, is_valid_solution = evaluate_best_setup(env, best_state, best_dist, num_samples)
+    incidence_rate = sum(is_valid_solution) / len(is_valid_solution)
+
+    return incidence_rate, all_max_eigs
+
+
+def setup_kinetic_env(cfg):
+
+    print("-" * 50)
+    print(OmegaConf.to_yaml(cfg))  # print config to verify
+    print("-" * 50)
+
+    # Call solvers from SKimPy
+    chk_jcbn = check_jacobian()
+    logging.disable(logging.CRITICAL)
+
+    # Integrate data
+    print("FYI: Loading kinetic and thermodynamic data.")
+    chk_jcbn._load_ktmodels(cfg.paths.met_model_name, 'fdp1') # Load kinetic and thermodynamic data
+    chk_jcbn._load_ssprofile(cfg.paths.met_model_name, 'fdp1', cfg.constraints.ss_idx) # Integrate steady state information
+
+    # Initialize environment
+    names_km = load_pkl(cfg.paths.names_km)
+    reward_fn = partial(reward_func, chk_jcbn, names_km, cfg.reward.eig_partition)
+    env = KineticEnv(cfg, reward_fn)
+    env.seed(cfg.seed)
+
+    return env

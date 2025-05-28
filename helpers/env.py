@@ -24,6 +24,8 @@ class KineticEnv:
         self.step_count = 0
         self.env_step = 0
 
+        self.logging_enabled = True
+
     def reset(self) -> torch.Tensor:
         """Sample the same deterministic initial params on every reset."""
         self.step_count = 0
@@ -56,11 +58,12 @@ class KineticEnv:
         r, all_eigenvalues = self.reward_fn(self.state)
         reward = float(r) if isinstance(r, torch.Tensor) else r
         max_eig_value = np.max(all_eigenvalues)
-        wandb.log({
-            "episode/max_eigenvalue": max_eig_value, 
-            "episode/was_valid_solution": int(max_eig_value < self.eig_cutoff), 
-            "env_step": self.env_step,
-        })
+        if self.logging_enabled:
+            wandb.log({
+                "episode/max_eigenvalue": max_eig_value, 
+                "episode/was_valid_solution": int(max_eig_value < self.eig_cutoff), 
+                "env_step": self.env_step,
+            })
 
 
         # increment and check termination

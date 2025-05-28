@@ -43,6 +43,10 @@ class PolicyNetwork(nn.Module):
         std = torch.exp(log_std)
         return mean, std
 
+    def load_pretrained_policy_net(self, policy_net_path):
+        self.load_state_dict(torch.load(policy_net_path, map_location="cpu"))
+        print(f"FYI: Loaded pretrained policy network from {policy_net_path}.")
+
 class ValueNetwork(nn.Module):
     def __init__(self, cfg):
         super(ValueNetwork, self).__init__()
