@@ -27,7 +27,7 @@ export LANG=C.UTF-8
 nvidia-smi
 
 # Baseline
-python train.py
+# python train.py
 
 # Batch of experiments
 # 1. lr scheduler (default constant)
@@ -61,4 +61,11 @@ python train.py
 # 8. Value loss weight (default 0.5)
 #python train.py method.value_loss_weight=0.25 'logger.tags=[value_loss_weight]'
 #python train.py method.value_loss_weight=0.75 'logger.tags=[value_loss_weight]'
+
+# 9. max log std (default 2)
+python train.py 'method.min_max_log_std=[-20, 5]' 'logger.tags=[part2, max_log_std]'
+python train.py 'method.min_max_log_std=[-20, 10]' 'logger.tags=[part2, max_log_std]'
+python train.py 'method.min_max_log_std=[-20, 15]' 'logger.tags=[part2, max_log_std]'
+
+
 EOF
