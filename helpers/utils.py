@@ -292,30 +292,14 @@ def evaluate_and_log_best_setup(env, state, dist, n_samples, episode):
     log_max_eig_dist_and_incidence_rate(all_max_eigs, is_valid_solution, episode)
 
 
-def get_incidence_rate(env, policy_net, max_steps_per_episode=50, num_samples=100, device="cuda"):
+def get_incidence_rate(env, best_setup, num_samples=100, device="cuda"):
 
-    # Do one episode and find the best state and action distribution
-    best_setup = None
-    best_reward = -math.inf
-    state = env.reset().to(device)
-    for _ in tqdm(range(max_steps_per_episode), desc="Getting best setup"):
-        mean, std = policy_net(state)
-        dist = torch.distributions.Normal(mean, std)
-
-        action = dist.rsample()
-        next_state, reward, done = env.step(action)
-        next_state = next_state.to(device)
-
-        if best_setup is None or reward > best_reward:
-            best_setup = (dist, state)
-            best_reward = reward
-
-        state = next_state
-        if done:
-            break
+    # Unpack best setup
+    best_state = best_setup["best_state"]
+    best_mean, best_std = best_setup["best_mean"], best_setup["best_std"]
+    best_dist = torch.distributions.Normal(best_mean, best_std)
     
     # Evaluate the best setup
-    best_dist, best_state = best_setup
     all_max_eigs, is_valid_solution = evaluate_best_setup(env, best_state, best_dist, num_samples)
     incidence_rate = sum(is_valid_solution) / len(is_valid_solution)
 

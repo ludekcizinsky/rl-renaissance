@@ -66,6 +66,4 @@ nvidia-smi
 python train.py 'method.min_max_log_std=[-20, 5]' 'logger.tags=[part2, max_log_std]'
 python train.py 'method.min_max_log_std=[-20, 10]' 'logger.tags=[part2, max_log_std]'
 python train.py 'method.min_max_log_std=[-20, 15]' 'logger.tags=[part2, max_log_std]'
-
-
 EOF
