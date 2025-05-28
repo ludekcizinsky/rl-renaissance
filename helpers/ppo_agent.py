@@ -40,6 +40,7 @@ class PolicyNetwork(nn.Module):
         base_out = self.base(x)
         mean = self.mean_head(base_out)
         log_std = self.log_std_head(base_out)
+        log_std = torch.clamp(log_std, min=-20, max=2)
         std = torch.exp(log_std)
         return mean, std
 
