@@ -8,8 +8,8 @@
 #SBATCH --cpus-per-task=20
 #SBATCH --mem=32G
 #SBATCH --ntasks=1
-#SBATCH --account=math-454
-#SBATCH --qos=math-454
+#SBATCH --account=cs-503
+#SBATCH --qos=cs-503
 
 USER=$1
 cd /home/$USER/rl-gen-of-kinetic-models/
