@@ -11,7 +11,7 @@ launch_cmd: null # will be set at runtime dynamically
 logger:
   project: rl-renaissance
   entity: ludekcizinsky
-  tags: [baseline]
+  tags: [part2]
 
 
 paths:

@@ -6,7 +6,7 @@ import math
 
 from helpers.buffers import TrajectoryBuffer
 from helpers.env import KineticEnv
-from helpers.utils import compute_grad_norm, evaluate_and_log_best_setup, log_summary_metrics
+from helpers.utils import compute_grad_norm
 from helpers.lr_schedulers import get_lr_scheduler
 from typing import Dict
 import wandb
@@ -92,6 +92,27 @@ class PPOAgent:
         self.global_best_setup = None
         self.first_valid_setup = None
 
+        # running mean/std buffers for obs
+        self.obs_mean = torch.zeros(cfg.env.p_size, device=self.device)
+        self.obs_var  = torch.ones(cfg.env.p_size, device=self.device)
+        self.obs_count= 1e-4
+
+    def normalize_obs(self, x):
+        # update running stats
+        batch_mean = x.mean(0)
+        batch_var  = x.var(0, unbiased=False)
+        batch_n    = x.shape[0]
+
+        # Welford online update
+        delta      = batch_mean - self.obs_mean
+        tot_count  = self.obs_count + batch_n
+        self.obs_mean += delta * batch_n / tot_count
+        self.obs_var  = (self.obs_var * self.obs_count + batch_var * batch_n
+                        + delta**2 * self.obs_count * batch_n / tot_count) / tot_count
+        self.obs_count = tot_count
+
+        # normalize
+        return (x - self.obs_mean) / torch.sqrt(self.obs_var + 1e-8)
 
     def collect_trajectory(self, env: KineticEnv, episode: int):
         buf = TrajectoryBuffer()
@@ -124,8 +145,8 @@ class PPOAgent:
         
         # Parse best setup
         best_dist, best_state, best_mean, best_std = best_setup
-        if episode % 10 == 0:
-            evaluate_and_log_best_setup(env, best_state, best_dist, self.n_eval_samples_in_episode, episode)
+        # if episode % 10 == 0:
+        # evaluate_and_log_best_setup(env, best_state, best_dist, self.n_eval_samples_in_episode, episode)
 
         # Global best setup
         trajectory = buf.to_tensors()
@@ -139,7 +160,6 @@ class PPOAgent:
         # First valid setup
         if self.first_valid_setup is None and best_reward > 0.5:
             self.first_valid_setup = (best_mean, best_std, best_state, best_step, episode)
-            log_summary_metrics(env, self.first_valid_setup, section="first_valid_setup")
             print(f"FYI: First valid setup found in episode {episode} at step {best_step}.")
 
         # Log episode metrics
@@ -258,6 +278,11 @@ class PPOAgent:
                 b_advs    = advs[batch_idxs] # (batch_size,)
                 b_returns = returns[batch_idxs] # (batch_size,)
 
+                # normalize states
+                b_states = self.normalize_obs(b_states)
+                b_advs = (b_advs - b_advs.mean()) / (b_advs.std(unbiased=False) + 1e-8)
+                b_advs = torch.clamp(b_advs, -3.0, +3.0)
+
                 # policy forward
                 mean, std = self.policy_net(b_states)
                 dist = torch.distributions.Normal(mean, std)
@@ -265,6 +290,9 @@ class PPOAgent:
 
                 # ratio for clipped surrogate
                 ratio = torch.exp(new_logp - b_oldlp)
+                clip_frac = ((ratio - 1.0).abs() > self.cfg.method.clip_eps).float().mean()
+                step_log_info["ppo/clip_fraction"] = clip_frac.item() # should be between 0.1 to 0.3
+
                 surr1 = ratio * b_advs
                 surr2 = torch.clamp(ratio, 1.0 - self.cfg.method.clip_eps, 1.0 + self.cfg.method.clip_eps) * b_advs
                 step_log_info["ppo/advs"] = b_advs.mean().item()
@@ -281,9 +309,14 @@ class PPOAgent:
                 value_loss = (b_returns - new_values).pow(2).mean()
                 step_log_info["ppo/value_loss"] = value_loss.item()
 
+                # entropy
+                entropy = dist.entropy().sum(dim=-1).mean()
+                step_log_info["ppo/entropy"] = entropy.item()
+
                 # combined loss
                 loss = policy_loss \
-                     + self.cfg.method.value_loss_weight * value_loss
+                    + self.cfg.method.value_loss_weight * value_loss \
+                    - self.cfg.method.entropy_loss_weight * entropy
                 step_log_info["ppo/loss"] = loss.item()
 
                 # optimize

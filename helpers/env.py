@@ -38,7 +38,7 @@ class KineticEnv:
 
         return self.state.clone()
 
-    def step(self, action: torch.Tensor):
+    def step(self, action: torch.Tensor, return_all_eigenvalues: bool = False):
         """
         Apply delta-action, clamp to integer bounds, and compute reward.
 
@@ -71,7 +71,10 @@ class KineticEnv:
         self.env_step += 1
         done = (self.step_count >= self.max_steps)
 
-        return self.state.clone(), reward, done
+        if return_all_eigenvalues:
+            return self.state.clone(), reward, done, all_eigenvalues
+        else:
+            return self.state.clone(), reward, done
 
     def render(self):
         """Print current state of parameters."""

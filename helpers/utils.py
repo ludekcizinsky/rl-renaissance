@@ -16,6 +16,7 @@ from tqdm import tqdm
 
 from helpers.jacobian_solver import check_jacobian
 from helpers.env import KineticEnv
+from torch.distributions import Normal
 
 def get_timestep_embedding(timestep: int, embedding_dim: int, max_period: float = 10000) -> torch.Tensor:
     """
@@ -352,3 +353,71 @@ def setup_kinetic_env(cfg):
     env.seed(cfg.seed)
 
     return env
+
+
+@torch.no_grad()
+def sample_params(
+    policy, 
+    env, 
+    N: int = 10, 
+    max_steps: int = 50,
+    deterministic: bool = False
+):
+    """
+    Run exactly N stochastic (or deterministic) roll-outs through the policy,
+    regardless of validity, and return the final state & reward for each.
+
+    Returns
+    -------
+    List[Tensor]   final_states   length == N
+    List[float]    final_rewards  length == N
+    """
+    device = next(policy.parameters()).device
+    final_states  = []
+    final_rewards = []
+    final_max_eigs = []
+
+    for _ in tqdm(range(N), desc="Sampling parameters"):
+        # reset to a fresh random start
+        state = env.reset().to(device)
+        reward = 0.0
+
+        # step until done or max_steps
+        for t in range(max_steps):
+            mean, std = policy(state)
+            if deterministic:
+                action = mean
+            else:
+                dist   = Normal(mean, std)
+                action = dist.rsample()
+
+            state, reward, done, all_eigenvalues = env.step(action, return_all_eigenvalues=True)
+            max_eig = np.max(all_eigenvalues)
+            state = state.to(device)
+            if done or reward > 0.5:
+                break
+
+        final_states .append(state.clone())
+        final_rewards.append(reward)
+        final_max_eigs.append(max_eig)
+
+    return final_states, final_rewards, final_max_eigs
+
+
+def log_final_eval_metrics(policy_net, env, N: int = 100, max_steps: int = 50, wandb_summary=None):
+    _, _, final_max_eigs = sample_params(policy_net, env, N, max_steps)
+
+    is_valid_solution = [max_eig < env.eig_cutoff for max_eig in final_max_eigs]
+    incidence_rate = sum(is_valid_solution) / len(is_valid_solution)
+
+    if wandb_summary is None:
+        wandb_summary = wandb.summary
+
+
+    wandb_summary["final_eval/incidence_rate"] = incidence_rate
+    wandb_summary["final_eval/num_samples"] = len(final_max_eigs)
+    wandb_summary["final_eval/max_eigs_mean"] = np.mean(final_max_eigs)
+    wandb_summary["final_eval/max_eigs_min"] = np.min(final_max_eigs)
+    wandb_summary["final_eval/max_eigs_max"] = np.max(final_max_eigs)
+    wandb_summary["final_eval/max_eigs_std"] = np.std(final_max_eigs)
+    wandb_summary["final_eval/max_eigs_median"] = np.median(final_max_eigs)

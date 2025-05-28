@@ -28,43 +28,47 @@ export LANG=C.UTF-8
 nvidia-smi
 
 # Baseline
-# python train.py
+python train.py 'logger.tags=[part2, baseline]'
 
-# Batch of experiments
+# Batch of ablations
 # 1. lr scheduler (default constant)
-#python train.py lr_scheduler=cosine 'logger.tags=[lr_scheduler, cosine]'
-#python train.py lr_scheduler=linear_decay 'logger.tags=[lr_scheduler, linear_decay]'
+python train.py lr_scheduler=cosine 'logger.tags=[part2, lr_scheduler, cosine]'
+python train.py lr_scheduler=linear_decay 'logger.tags=[part2, lr_scheduler, linear_decay]'
 
 # 2. action scale (default 1.0)
-# python train.py env.action_scale=0.25 'logger.tags=[action_scale]'
-#python train.py env.action_scale=0.5 'logger.tags=[action_scale]'
-#python train.py env.action_scale=0.75 'logger.tags=[action_scale]'
+python train.py env.action_scale=0.5 'logger.tags=[part2, action_scale]'
+python train.py env.action_scale=1.5 'logger.tags=[part2, action_scale]'
 
-# 3. number of epochs (default 10)
-#python train.py training.num_epochs=5 'logger.tags=[num_epochs]'
+# 3. PPO epochs per update (default 10)
+python train.py training.num_epochs=4 'logger.tags=[part2, num_epochs]'
+python train.py training.num_epochs=6 'logger.tags=[part2, num_epochs]'
 
-# 4. max grad norm (default 0.5)
-#python train.py training.max_grad_norm=0.25 'logger.tags=[max_grad_norm]'
-#python train.py training.max_grad_norm=0.75 'logger.tags=[max_grad_norm]'
-#python train.py training.max_grad_norm=1.0 'logger.tags=[max_grad_norm]'
+# 4. Gradient norm clipping (default 0.5)
+python train.py training.max_grad_norm=0.25 'logger.tags=[part2, max_grad_norm]'
+python train.py training.max_grad_norm=1.0 'logger.tags=[part2, max_grad_norm]'
 
-# 5. lr actor (default 3e-4)
-#python train.py method.actor_lr=1e-4 'logger.tags=[lr_actor]'
-#python train.py method.actor_lr=1e-5 'logger.tags=[lr_actor]'
+# 5. Actor learning rate (default 1e-4)
+python train.py method.actor_lr=5e-5 'logger.tags=[part2, lr_actor]'
+python train.py method.actor_lr=2e-4 'logger.tags=[part2, lr_actor]'
 
-# 6. lr critic (default 1e-3)
-#python train.py method.critic_lr=5e-4 'logger.tags=[lr_critic]'
-#python train.py method.critic_lr=1e-4 'logger.tags=[lr_critic]'
+# 6. Critic learning rate (default 1e-3)
+python train.py method.critic_lr=5e-4 'logger.tags=[part2, lr_critic]'
+python train.py method.critic_lr=2e-3 'logger.tags=[part2, lr_critic]'
 
-# 7. clip eps (default 0.2)
-#python train.py method.clip_eps=0.1 'logger.tags=[clip_eps]'
+# 7. Clip epsilon (default 0.2)
+python train.py method.clip_eps=0.1 'logger.tags=[part2, clip_eps]'
+python train.py method.clip_eps=0.25 'logger.tags=[part2, clip_eps]'
 
-# 8. Value loss weight (default 0.5)
-#python train.py method.value_loss_weight=0.25 'logger.tags=[value_loss_weight]'
-#python train.py method.value_loss_weight=0.75 'logger.tags=[value_loss_weight]'
+# 8. Entropy loss weight (default 0.01)
+#python train.py method.entropy_loss_weight=0.005 'logger.tags=[part2, entropy_loss_weight]'
+#python train.py method.entropy_loss_weight=0.02 'logger.tags=[part2, entropy_loss_weight]'
 
-# 9. max log std (default 2)
-python train.py 'method.min_max_log_std=[-20, 5]' 'logger.tags=[part2, max_log_std]'
-python train.py 'method.min_max_log_std=[-20, 10]' 'logger.tags=[part2, max_log_std]'
-python train.py 'method.min_max_log_std=[-20, 15]' 'logger.tags=[part2, max_log_std]'
+# 9. Log std bounds (default [-6, 2])
+python train.py method.min_log_std=-8 'logger.tags=[part2, log_std_bounds]'
+python train.py method.min_log_std=-4 'logger.tags=[part2, log_std_bounds]'
+python train.py method.max_log_std=3 'logger.tags=[part2, log_std_bounds]'
+
+# 10. Number of episodes (default 100)
+python train.py training.num_episodes=30 'logger.tags=[part2, num_episodes]'
+python train.py training.num_episodes=60 'logger.tags=[part2, num_episodes]'
 EOF
