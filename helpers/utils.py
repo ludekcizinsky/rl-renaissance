@@ -198,6 +198,7 @@ def log_rl_models(
     policy_net_dict: dict,
     value_net_dict: dict,
     best_setup, 
+    first_valid_setup,
     save_dir:      str = ".",
 ):
     """
@@ -210,8 +211,10 @@ def log_rl_models(
         save_dir:       Directory where to save temporary .pt files.
     """
 
-    # Unpack best setup
-    best_mean, best_std, best_state, best_step, episode = best_setup
+    # Unpack best setups
+    best_mean, best_std, best_state, best_step, best_episode = best_setup
+    if first_valid_setup is not None:
+        first_valid_mean, first_valid_std, first_valid_state, first_valid_step, first_valid_episode = first_valid_setup
 
     # Prepare file paths
     run_name = wandb.run.name
@@ -219,19 +222,30 @@ def log_rl_models(
     os.makedirs(save_dir, exist_ok=True)
     policy_path = os.path.join(save_dir, "policy.pt")
     value_path  = os.path.join(save_dir, "value.pt")
-    best_path   = os.path.join(save_dir, f"best_setup_e{episode}_s{best_step}.pt")
+    best_path   = os.path.join(save_dir, f"best_setup_e{best_episode}_s{best_step}.pt")
+    if first_valid_setup is not None:
+        first_valid_path = os.path.join(save_dir, f"first_valid_setup_e{first_valid_episode}_s{first_valid_step}.pt")
 
     # Save state_dicts
     torch.save(policy_net_dict, policy_path)
     torch.save(value_net_dict,  value_path)
 
     # Save best setup
-    bundle = {
+    best_bundle = {
         "best_state": best_state,
         "best_mean": best_mean,
         "best_std": best_std,
     }
-    torch.save(bundle, best_path)
+    torch.save(best_bundle, best_path)
+
+    # Save first valid setup
+    if first_valid_setup is not None:
+        first_valid_bundle = {
+            "first_valid_state": first_valid_state,
+            "first_valid_mean": first_valid_mean,
+            "first_valid_std": first_valid_std,
+        }
+        torch.save(first_valid_bundle, first_valid_path)
 
     # Build and log the Artifact
     artifact = wandb.Artifact(
@@ -242,6 +256,8 @@ def log_rl_models(
     artifact.add_file(policy_path)
     artifact.add_file(value_path)
     artifact.add_file(best_path)
+    if first_valid_setup is not None:
+        artifact.add_file(first_valid_path)
     wandb.log_artifact(artifact)
     wandb.log_artifact(artifact, aliases=["best"])
 

@@ -90,6 +90,7 @@ class PPOAgent:
         self.global_best_reward = -math.inf
         self.global_best_model = None
         self.global_best_setup = None
+        self.first_valid_setup = None
 
 
     def collect_trajectory(self, env: KineticEnv, episode: int):
@@ -139,6 +140,10 @@ class PPOAgent:
             self.global_best_model = (self.policy_net.state_dict(), self.value_net.state_dict())
             self.global_best_setup = (best_mean, best_std, best_state, best_step, episode)
             print(f"FYI: New global best reward: {self.global_best_reward} in episode {episode} at step {best_step}.")
+
+        if self.first_valid_setup is None and best_reward > 0.5:
+            self.first_valid_setup = (best_mean, best_std, best_state, best_step, episode)
+            print(f"FYI: First valid setup found in episode {episode} at step {best_step}.")
 
         buf.clear()
         return trajectory

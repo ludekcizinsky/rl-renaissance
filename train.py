@@ -61,7 +61,8 @@ def train(cfg: DictConfig):
         if cfg.training.save_trained_models:
             policy_net_dict, value_net_dict = ppo_agent.global_best_model
             best_setup = ppo_agent.global_best_setup
-            log_rl_models(policy_net_dict, value_net_dict, best_setup, save_dir=cfg.paths.output_dir)
+            first_valid_setup = ppo_agent.first_valid_setup
+            log_rl_models(policy_net_dict, value_net_dict, best_setup, first_valid_setup, save_dir=cfg.paths.output_dir)
 
     except Exception as e:
         print(f"Error: {e}")
