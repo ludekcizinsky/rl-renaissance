@@ -441,3 +441,15 @@ def log_final_eval_metrics(policy_net, env, obs_mean, obs_var, N: int = 100, max
     wandb_summary["final_eval/max_eigs_max"] = np.max(final_max_eigs)
     wandb_summary["final_eval/max_eigs_std"] = np.std(final_max_eigs)
     wandb_summary["final_eval/max_eigs_median"] = np.median(final_max_eigs)
+
+
+def compute_clip_eps(eps0, eps1, frac_done, kind="linear"):
+
+    if kind == "linear":
+        clip_eps = eps0 + frac_done * (eps1 - eps0)
+    elif kind == "cosine":
+        clip_eps = eps1 + 0.5*(eps0 - eps1)*(1 + math.cos(math.pi*frac_done))
+    else:
+        raise ValueError(f"Invalid kind: {kind}")
+
+    return clip_eps

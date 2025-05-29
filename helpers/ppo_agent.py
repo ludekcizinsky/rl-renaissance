@@ -6,7 +6,7 @@ import math
 
 from helpers.buffers import TrajectoryBuffer
 from helpers.env import KineticEnv
-from helpers.utils import compute_grad_norm
+from helpers.utils import compute_grad_norm, compute_clip_eps
 from helpers.lr_schedulers import get_lr_scheduler
 from typing import Dict
 import wandb
@@ -255,9 +255,9 @@ class PPOAgent:
         # clip eps annealing
         eps0 = self.cfg.method.clip_eps_start
         eps1 = self.cfg.method.clip_eps_end
-        T_eps = float(self.cfg.training.num_episodes)
+        T_eps = float(self.cfg.method.t_eps)
         frac_done = min(self.current_episode / T_eps, 1.0)
-        clip_eps = eps0 + frac_done * (eps1 - eps0)
+        clip_eps = compute_clip_eps(eps0, eps1, frac_done, self.cfg.method.clip_eps_kind)
 
         # unpack trajectory
         states = trajectory["states"] # (T, p_size)
