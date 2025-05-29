@@ -2,7 +2,7 @@
 #SBATCH --job-name=final1_rl_exp
 #SBATCH --output=outputs/slurm/%x.%j.out
 #SBATCH --error=outputs/slurm/%x.%j.err
-#SBATCH --time=09:30:00
+#SBATCH --time=09:00:00
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=10
