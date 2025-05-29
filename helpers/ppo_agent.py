@@ -124,6 +124,9 @@ class PPOAgent:
         for step in range(self.cfg.training.max_steps_per_episode):
 
             mean, std = self.policy_net(state)
+            mean = torch.nan_to_num(mean, nan=0.0, posinf=1e3, neginf=-1e3)
+            std  = torch.nan_to_num(std, nan=1e-3, posinf=1e3, neginf=1e-3)
+            std = std.clamp(min=1e-3, max=1e3)
             dist = torch.distributions.Normal(mean, std)
 
             action = dist.rsample()
