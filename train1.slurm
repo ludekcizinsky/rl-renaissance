@@ -1,15 +1,14 @@
 #!/bin/bash
-#SBATCH --job-name=rl_exp
+#SBATCH --job-name=b1_rl_exp
 #SBATCH --output=outputs/slurm/%x.%j.out
 #SBATCH --error=outputs/slurm/%x.%j.err
-#SBATCH --time=01:00:00
+#SBATCH --time=09:00:00
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=20
 #SBATCH --mem=32G
 #SBATCH --ntasks=1
-#SBATCH --account=cs-503
-#SBATCH --qos=cs-503
+#SBATCH --account=master
 
 USER=$1
 cd /home/$USER/rl-gen-of-kinetic-models/
@@ -52,23 +51,23 @@ python train.py method.actor_lr=5e-5 'logger.tags=[part2, lr_actor]'
 python train.py method.actor_lr=2e-4 'logger.tags=[part2, lr_actor]'
 
 # 6. Critic learning rate (default 1e-3)
-python train.py method.critic_lr=5e-4 'logger.tags=[part2, lr_critic]'
-python train.py method.critic_lr=2e-3 'logger.tags=[part2, lr_critic]'
+# python train.py method.critic_lr=5e-4 'logger.tags=[part2, lr_critic]'
+# python train.py method.critic_lr=2e-3 'logger.tags=[part2, lr_critic]'
 
 # 7. Clip epsilon (default 0.2)
-python train.py method.clip_eps=0.1 'logger.tags=[part2, clip_eps]'
-python train.py method.clip_eps=0.25 'logger.tags=[part2, clip_eps]'
+# python train.py method.clip_eps=0.1 'logger.tags=[part2, clip_eps]'
+# python train.py method.clip_eps=0.25 'logger.tags=[part2, clip_eps]'
 
 # 8. Entropy loss weight (default 0.01)
 #python train.py method.entropy_loss_weight=0.005 'logger.tags=[part2, entropy_loss_weight]'
 #python train.py method.entropy_loss_weight=0.02 'logger.tags=[part2, entropy_loss_weight]'
 
 # 9. Log std bounds (default [-6, 2])
-python train.py method.min_log_std=-8 'logger.tags=[part2, log_std_bounds]'
-python train.py method.min_log_std=-4 'logger.tags=[part2, log_std_bounds]'
-python train.py method.max_log_std=3 'logger.tags=[part2, log_std_bounds]'
+# python train.py method.min_log_std=-8 'logger.tags=[part2, log_std_bounds]'
+# python train.py method.min_log_std=-4 'logger.tags=[part2, log_std_bounds]'
+# python train.py method.max_log_std=3 'logger.tags=[part2, log_std_bounds]'
 
 # 10. Number of episodes (default 100)
-python train.py training.num_episodes=30 'logger.tags=[part2, num_episodes]'
-python train.py training.num_episodes=60 'logger.tags=[part2, num_episodes]'
+# python train.py training.num_episodes=30 'logger.tags=[part2, num_episodes]'
+# python train.py training.num_episodes=60 'logger.tags=[part2, num_episodes]'
 EOF
