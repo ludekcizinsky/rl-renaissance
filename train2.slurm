@@ -28,20 +28,20 @@ nvidia-smi
 
 
 # 1. EPS
-python train.py method.clip_eps_kind=cosine 'logger.tags=[final,clip_eps_cosine]'
-python train.py method.t_eps=50 'logger.tags=[final,clip_decay_fast]'
-python train.py method.t_eps=200 'logger.tags=[final,clip_decay_slow]'
-python train.py method.clip_eps_end=0.05 'logger.tags=[final,clip_eps_end_low]'
-python train.py method.clip_eps_start=0.4 'logger.tags=[final,clip_eps_start_high]'
+python train.py method.clip_eps_kind=cosine 'logger.tags=[final, clip_eps_cosine]'
+python train.py method.t_eps=50 'logger.tags=[final, clip_decay_fast]'
+python train.py method.t_eps=200 'logger.tags=[final, clip_decay_slow]'
+python train.py method.clip_eps_end=0.05 'logger.tags=[final, clip_eps_end_low]'
+python train.py method.clip_eps_start=0.4 'logger.tags=[final, clip_eps_start_high]'
 
 # 2. Actor LR
-python train.py method.actor_lr=5e-5 'logger.tags=[final,actor_lr_down]'
-python train.py method.actor_lr=1e-5 'logger.tags=[final,actor_lr_down]'
+python train.py method.actor_lr=5e-5 'logger.tags=[final, actor_lr_down]'
+python train.py method.actor_lr=1e-5 'logger.tags=[final, actor_lr_down]'
 
 # 3. GAE lambda
-python train.py method.gae_lambda=0.95 'logger.tags=[final,gae_lambda_down]'
-python train.py method.gae_lambda=0.99 'logger.tags=[final,gae_lambda_up]'
+python train.py method.gae_lambda=0.95 'logger.tags=[final, gae_lambda_down]'
+python train.py method.gae_lambda=0.99 'logger.tags=[final, gae_lambda_up]'
 
 # 4. Value loss weight
-python train.py method.value_loss_weight=0.3 'logger.tags=[final,value_loss_weight_down]'
+python train.py method.value_loss_weight=0.3 'logger.tags=[final, value_loss_weight_down]'
 EOF
