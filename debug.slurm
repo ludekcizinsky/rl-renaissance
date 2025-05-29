@@ -34,5 +34,5 @@ nvidia-smi
 # python train.py method.actor_lr=2e-4 method.critic_lr=1e-3 method.clip_eps=0.2 method.min_log_std=-6 method.max_log_std=2 method.entropy_loss_weight=0.01 training.num_episodes=100 'logger.tags=[debug, best_setup, actor_lr]'
 # python train.py method.entropy_loss_weight=0.02 training.num_episodes=40 'logger.tags=[debug, entropy_loss_weight]'
 # python train.py method.value_loss_weight=1.0 training.num_episodes=40 'logger.tags=[debug, value_loss_weight]'
-python train.py 'logger.tags=[debug, best_setup, clip_eps_decay, reproduce]'
+# python train.py 'logger.tags=[debug, best_setup, clip_eps_decay, reproduce, new_metrics]'
 EOF

@@ -1,12 +1,12 @@
 #!/bin/bash
-#SBATCH --job-name=b1_rl_exp
+#SBATCH --job-name=final2_rl_exp
 #SBATCH --output=outputs/slurm/%x.%j.out
 #SBATCH --error=outputs/slurm/%x.%j.err
 #SBATCH --time=09:00:00
 #SBATCH --partition=gpu
 #SBATCH --gres=gpu:1
-#SBATCH --cpus-per-task=20
-#SBATCH --mem=32G
+#SBATCH --cpus-per-task=10
+#SBATCH --mem=16G
 #SBATCH --ntasks=1
 #SBATCH --account=master
 
@@ -26,41 +26,22 @@ export LC_ALL=C.UTF-8
 export LANG=C.UTF-8
 nvidia-smi
 
-# Baseline
-# python train.py 'logger.tags=[part2, baseline]'
 
-# Batch of ablations
-# 1. lr scheduler (default constant)
-# python train.py lr_scheduler=cosine 'logger.tags=[part2, lr_scheduler, cosine]'
-# python train.py lr_scheduler=linear_decay 'logger.tags=[part2, lr_scheduler, linear_decay]'
+# 1. EPS
+python train.py method.clip_eps_kind=cosine 'logger.tags=[final,clip_eps_cosine]'
+python train.py method.t_eps=50 'logger.tags=[final,clip_decay_fast]'
+python train.py method.t_eps=200 'logger.tags=[final,clip_decay_slow]'
+python train.py method.clip_eps_end=0.05 'logger.tags=[final,clip_eps_end_low]'
+python train.py method.clip_eps_start=0.4 'logger.tags=[final,clip_eps_start_high]'
 
-# 2. action scale (default 1.0)
-# python train.py env.action_scale=0.5 'logger.tags=[part2, action_scale]'
-# python train.py env.action_scale=1.5 'logger.tags=[part2, action_scale]'
+# 2. Actor LR
+python train.py method.actor_lr=5e-5 'logger.tags=[final,actor_lr_down]'
+python train.py method.actor_lr=1e-5 'logger.tags=[final,actor_lr_down]'
 
-# 3. PPO epochs per update (default 10)
-# python train.py training.num_epochs=4 'logger.tags=[part2, num_epochs]'
-# python train.py training.num_epochs=6 'logger.tags=[part2, num_epochs]'
+# 3. GAE lambda
+python train.py method.gae_lambda=0.95 'logger.tags=[final,gae_lambda_down]'
+python train.py method.gae_lambda=0.99 'logger.tags=[final,gae_lambda_up]'
 
-# 4. Gradient norm clipping (default 0.5)
-# python train.py training.max_grad_norm=0.25 'logger.tags=[part2, max_grad_norm]'
-# python train.py training.max_grad_norm=1.0 'logger.tags=[part2, max_grad_norm]'
-
-# 5. Actor learning rate (default 5e-5)
-python train.py method.actor_lr=1e-4 'logger.tags=[part2, lr_actor]'
-python train.py method.actor_lr=2e-4 'logger.tags=[part2, lr_actor]'
-
-# 6. Clip epsilon (default 0.5)
-python train.py method.clip_eps=0.1 'logger.tags=[part2, clip_eps]'
-python train.py method.clip_eps=0.25 'logger.tags=[part2, clip_eps]'
-python train.py method.clip_eps=0.35 'logger.tags=[part2, clip_eps]'
-
-# 7. Entropy loss weight (default 0.01)
-python train.py method.entropy_loss_weight=0.005 'logger.tags=[part2, entropy_loss_weight]'
-python train.py method.entropy_loss_weight=0.02 'logger.tags=[part2, entropy_loss_weight]'
-
-# 8. Log std bounds (default [-6, 5])
-python train.py method.min_log_std=-8 'logger.tags=[part2, log_std_bounds]'
-python train.py method.min_log_std=-4 'logger.tags=[part2, log_std_bounds]'
-python train.py method.max_log_std=3 'logger.tags=[part2, log_std_bounds]'
+# 4. Value loss weight
+python train.py method.value_loss_weight=0.3 'logger.tags=[final,value_loss_weight_down]'
 EOF
