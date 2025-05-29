@@ -26,9 +26,6 @@ export LC_ALL=C.UTF-8
 export LANG=C.UTF-8
 nvidia-smi
 
-# Baseline
-python train.py 'logger.tags=[final, baseline]'
-
 # Batch of ablations
 # 1. lr scheduler (default constant)
 python train.py lr_scheduler=cosine 'logger.tags=[final, lr_scheduler, cosine]'
