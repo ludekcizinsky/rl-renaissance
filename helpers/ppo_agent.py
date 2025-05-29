@@ -285,6 +285,9 @@ class PPOAgent:
 
                 # policy forward
                 mean, std = self.policy_net(b_states)
+                mean = torch.nan_to_num(mean, nan=0.0, posinf=1e3, neginf=-1e3)
+                std  = torch.nan_to_num(std, nan=1e-3, posinf=1e3, neginf=1e-3)
+
                 dist = torch.distributions.Normal(mean, std)
                 new_logp = dist.log_prob(b_actions).sum(dim=-1)
 
@@ -318,6 +321,9 @@ class PPOAgent:
                     + self.cfg.method.value_loss_weight * value_loss \
                     - self.cfg.method.entropy_loss_weight * entropy
                 step_log_info["ppo/loss"] = loss.item()
+
+                if torch.isnan(loss):
+                    continue
 
                 # optimize
                 optim_log_info = self._optimize_policy(loss, self.cfg.training.max_grad_norm)
