@@ -405,7 +405,9 @@ def sample_params(
 
 
 def log_final_eval_metrics(policy_net, env, N: int = 100, max_steps: int = 50, wandb_summary=None):
+    env.logging_enabled = False
     _, _, final_max_eigs = sample_params(policy_net, env, N, max_steps)
+    env.logging_enabled = True
 
     is_valid_solution = [max_eig < env.eig_cutoff for max_eig in final_max_eigs]
     incidence_rate = sum(is_valid_solution) / len(is_valid_solution)

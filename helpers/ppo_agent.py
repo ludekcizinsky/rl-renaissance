@@ -120,15 +120,17 @@ class PPOAgent:
         best_reward = -math.inf
         best_step = None
 
-        state = env.reset().to(self.device)
+        state = env.reset()
         for step in range(self.cfg.training.max_steps_per_episode):
 
-            mean, std = self.policy_net(state)
+            state = state.to(self.device)
+            norm_state = self.normalize_obs(state.unsqueeze(0)).squeeze(0)
+            mean, std = self.policy_net(norm_state)
             dist = torch.distributions.Normal(mean, std)
 
             action = dist.rsample()
             log_prob = dist.log_prob(action).sum()
-            value = self.value_net(state)
+            value = self.value_net(norm_state)
 
             next_state, reward, done = env.step(action)
             next_state = next_state.to(self.device)
@@ -138,7 +140,7 @@ class PPOAgent:
                 best_reward = reward
                 best_step = step
 
-            buf.add(state, action, log_prob, value, reward, done)
+            buf.add(norm_state, action, log_prob, value, reward, done)
             state = next_state
             if done:
                 break
@@ -279,28 +281,28 @@ class PPOAgent:
                 b_returns = returns[batch_idxs] # (batch_size,)
 
                 # normalize states
-                b_states = self.normalize_obs(b_states)
+                # b_states = self.normalize_obs(b_states)
                 b_advs = (b_advs - b_advs.mean()) / (b_advs.std(unbiased=False) + 1e-6)
-                if self.global_step > 500:
-                    b_advs = torch.clamp(b_advs, -3.0, +3.0)
+                # if self.global_step > 500:
+                b_advs = torch.clamp(b_advs, -3.0, +3.0)
 
                 # policy forward
                 mean, std = self.policy_net(b_states)
                 dist = torch.distributions.Normal(mean, std)
                 new_logp = dist.log_prob(b_actions).sum(dim=-1)
+                step_log_info["ppo/min_std"] = std.min().item()
+                step_log_info["ppo/max_std"] = std.max().item()
 
                 # ratio for clipped surrogate
                 delta = new_logp - b_oldlp
-                eps   = self.cfg.method.clip_eps
-                # ratio = torch.exp(new_logp - b_oldlp)
-                delta_clipped = torch.clamp(delta, -eps, +eps)
-                ratio         = torch.exp(delta_clipped)
+                step_log_info["ppo/raw_kl"] = delta.mean().item()
+                ratio = torch.exp(delta)
                 clip_frac = ((ratio - 1.0).abs() > self.cfg.method.clip_eps).float().mean()
                 step_log_info["ppo/clip_fraction"] = clip_frac.item() # should be between 0.1 to 0.3
 
                 surr1 = ratio * b_advs
-                # surr2 = torch.clamp(ratio, 1.0 - self.cfg.method.clip_eps, 1.0 + self.cfg.method.clip_eps) * b_advs
-                surr2 = delta_clipped.exp().clamp(1-eps,1+eps) * b_advs
+                eps = self.cfg.method.clip_eps
+                surr2 = torch.clamp(ratio, 1.0 - eps, 1.0 + eps) * b_advs
                 step_log_info["ppo/advs"] = b_advs.mean().item()
                 step_log_info["ppo/per_dim_ratio"] = torch.exp((new_logp - b_oldlp) / self.cfg.env.p_size).mean().item()
                 step_log_info["ppo/surr1"] = surr1.mean().item()
