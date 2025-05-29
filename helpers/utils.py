@@ -201,6 +201,7 @@ def log_rl_models(
     best_setup, 
     first_valid_setup,
     normalisation,
+    final_eval_out,
     save_dir:      str = ".",
 ):
     """
@@ -225,6 +226,7 @@ def log_rl_models(
     policy_path = os.path.join(save_dir, "policy.pt")
     value_path  = os.path.join(save_dir, "value.pt")
     normalisation_path = os.path.join(save_dir, "normalisation.pt")
+    final_eval_path = os.path.join(save_dir, "final_eval.pt")
     best_path   = os.path.join(save_dir, f"best_setup_e{best_episode}_s{best_step}.pt")
     if first_valid_setup is not None:
         first_valid_path = os.path.join(save_dir, f"first_valid_setup_e{first_valid_episode}_s{first_valid_step}.pt")
@@ -257,6 +259,9 @@ def log_rl_models(
     }
     torch.save(norm_bundle, normalisation_path)
 
+    # Save final eval
+    torch.save(final_eval_out, final_eval_path)
+
     # Build and log the Artifact
     artifact = wandb.Artifact(
         name=run_name,
@@ -269,6 +274,7 @@ def log_rl_models(
     if first_valid_setup is not None:
         artifact.add_file(first_valid_path)
     artifact.add_file(normalisation_path)
+    artifact.add_file(final_eval_path)
     wandb.log_artifact(artifact)
     wandb.log_artifact(artifact, aliases=["best"])
 
@@ -389,6 +395,7 @@ def sample_params(
     obs_var  = obs_var.to(device)
 
     final_states, final_rewards, final_max_eigs = [], [], []
+    t_to_valid_solution = []
 
     for _ in tqdm(range(N), desc="Sampling parameters"):
         state = env.reset().to(device)
@@ -414,17 +421,26 @@ def sample_params(
             print(f"[{t}]: max_eig: {max_eig}, reward: {reward}")
             if done or reward > 0.5:
                 break
+        
 
-        final_states.append(state.clone())
         final_rewards.append(reward)
         final_max_eigs.append(max_eig)
 
-    return final_states, final_rewards, final_max_eigs
+        if reward > 0.5:
+            t_to_valid_solution.append(t+1) 
+            final_states.append(state.clone())
+
+    if len(t_to_valid_solution) > 0:
+        t_to_valid_solution = np.mean(t_to_valid_solution)
+    else:
+        t_to_valid_solution = None
+
+    return final_states, final_rewards, final_max_eigs, t_to_valid_solution
 
 
 def log_final_eval_metrics(policy_net, env, obs_mean, obs_var, N: int = 100, max_steps: int = 50, wandb_summary=None):
     env.logging_enabled = False
-    _, _, final_max_eigs = sample_params(policy_net, env, obs_mean, obs_var, N, max_steps)
+    final_states, final_rewards, final_max_eigs, t_to_valid_solution = sample_params(policy_net, env, obs_mean, obs_var, N, max_steps)
     env.logging_enabled = True
 
     is_valid_solution = [max_eig < env.eig_cutoff for max_eig in final_max_eigs]
@@ -441,6 +457,21 @@ def log_final_eval_metrics(policy_net, env, obs_mean, obs_var, N: int = 100, max
     wandb_summary["final_eval/max_eigs_max"] = np.max(final_max_eigs)
     wandb_summary["final_eval/max_eigs_std"] = np.std(final_max_eigs)
     wandb_summary["final_eval/max_eigs_median"] = np.median(final_max_eigs)
+
+    if t_to_valid_solution is not None:
+        wandb_summary["final_eval/t_to_valid_solution"] = t_to_valid_solution
+
+    out_dict = dict()
+    if len(final_states) > 0:
+        final_states = torch.stack(final_states)
+        final_states = final_states.to("cpu")
+        out_dict["final_states"] = final_states
+        wandb_summary["final_eval/final_states_std_mean"] = torch.std(final_states, dim=0).mean().item()
+
+    out_dict["final_rewards"] = torch.Tensor(final_rewards)
+    out_dict["final_max_eigs"] = torch.Tensor(final_max_eigs)
+
+    return out_dict
 
 
 def compute_clip_eps(eps0, eps1, frac_done, kind="linear"):

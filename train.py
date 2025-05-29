@@ -65,18 +65,18 @@ def train(cfg: DictConfig):
             # Update PPO agent
             ppo_agent.update(trajectory)
 
-        # Log models
+        # Final evaluation
         policy_net_dict, value_net_dict = ppo_agent.global_best_model
+        ppo_agent.policy_net.load_state_dict(policy_net_dict)
+        ppo_agent.policy_net.eval()
+        final_eval_out = log_final_eval_metrics(ppo_agent.policy_net, env, ppo_agent.obs_mean, ppo_agent.obs_var, N=100, max_steps=cfg.training.max_steps_per_episode, wandb_summary=run.summary)
+
+        # Log models
         if cfg.training.save_trained_models:
             first_valid_setup = ppo_agent.first_valid_setup
             best_setup = ppo_agent.global_best_setup
             normalisation = (ppo_agent.obs_mean, ppo_agent.obs_var)
-            log_rl_models(policy_net_dict, value_net_dict, best_setup, first_valid_setup, normalisation, save_dir=cfg.paths.output_dir)
-
-        # Final evaluation
-        ppo_agent.policy_net.load_state_dict(policy_net_dict)
-        ppo_agent.policy_net.eval()
-        log_final_eval_metrics(ppo_agent.policy_net, env, ppo_agent.obs_mean, ppo_agent.obs_var, N=100, max_steps=cfg.training.max_steps_per_episode, wandb_summary=run.summary)
+            log_rl_models(policy_net_dict, value_net_dict, best_setup, first_valid_setup, normalisation, final_eval_out, save_dir=cfg.paths.output_dir)
 
 
     except Exception as e:
