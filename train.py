@@ -65,17 +65,19 @@ def train(cfg: DictConfig):
             # Update PPO agent
             ppo_agent.update(trajectory)
 
-        # Final evaluation
-        policy_net_dict, value_net_dict = ppo_agent.global_best_model
-        ppo_agent.policy_net.load_state_dict(policy_net_dict)
-        ppo_agent.policy_net.eval()
-        log_final_eval_metrics(ppo_agent.policy_net, env, N=100, max_steps=cfg.training.max_steps_per_episode, wandb_summary=run.summary)
-
         # Log models
+        policy_net_dict, value_net_dict = ppo_agent.global_best_model
         if cfg.training.save_trained_models:
             first_valid_setup = ppo_agent.first_valid_setup
             best_setup = ppo_agent.global_best_setup
-            log_rl_models(policy_net_dict, value_net_dict, best_setup, first_valid_setup, save_dir=cfg.paths.output_dir)
+            normalisation = (ppo_agent.obs_mean, ppo_agent.obs_var)
+            log_rl_models(policy_net_dict, value_net_dict, best_setup, first_valid_setup, normalisation, save_dir=cfg.paths.output_dir)
+
+        # Final evaluation
+        ppo_agent.policy_net.load_state_dict(policy_net_dict)
+        ppo_agent.policy_net.eval()
+        log_final_eval_metrics(ppo_agent.policy_net, env, ppo_agent.obs_mean, ppo_agent.obs_var, N=100, max_steps=cfg.training.max_steps_per_episode, wandb_summary=run.summary)
+
 
     except Exception as e:
         print(f"Error: {e}")

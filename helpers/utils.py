@@ -200,6 +200,7 @@ def log_rl_models(
     value_net_dict: dict,
     best_setup, 
     first_valid_setup,
+    normalisation,
     save_dir:      str = ".",
 ):
     """
@@ -223,6 +224,7 @@ def log_rl_models(
     os.makedirs(save_dir, exist_ok=True)
     policy_path = os.path.join(save_dir, "policy.pt")
     value_path  = os.path.join(save_dir, "value.pt")
+    normalisation_path = os.path.join(save_dir, "normalisation.pt")
     best_path   = os.path.join(save_dir, f"best_setup_e{best_episode}_s{best_step}.pt")
     if first_valid_setup is not None:
         first_valid_path = os.path.join(save_dir, f"first_valid_setup_e{first_valid_episode}_s{first_valid_step}.pt")
@@ -248,6 +250,13 @@ def log_rl_models(
         }
         torch.save(first_valid_bundle, first_valid_path)
 
+    # Save normalisation
+    norm_bundle = {
+        "obs_mean": normalisation[0],
+        "obs_var": normalisation[1],
+    }
+    torch.save(norm_bundle, normalisation_path)
+
     # Build and log the Artifact
     artifact = wandb.Artifact(
         name=run_name,
@@ -259,6 +268,7 @@ def log_rl_models(
     artifact.add_file(best_path)
     if first_valid_setup is not None:
         artifact.add_file(first_valid_path)
+    artifact.add_file(normalisation_path)
     wandb.log_artifact(artifact)
     wandb.log_artifact(artifact, aliases=["best"])
 
@@ -358,55 +368,63 @@ def setup_kinetic_env(cfg):
 @torch.no_grad()
 def sample_params(
     policy, 
-    env, 
+    env,
+    obs_mean: torch.Tensor,
+    obs_var:  torch.Tensor,
     N: int = 10, 
     max_steps: int = 50,
     deterministic: bool = False
 ):
     """
-    Run exactly N stochastic (or deterministic) roll-outs through the policy,
-    regardless of validity, and return the final state & reward for each.
+    Run N roll-outs through the policy (stochastic or deterministic),
+    using a frozen normalization defined by obs_mean/obs_var.
 
-    Returns
-    -------
-    List[Tensor]   final_states   length == N
-    List[float]    final_rewards  length == N
+    Returns:
+        final_states   : List[Tensor]   length == N
+        final_rewards  : List[float]    length == N
+        final_max_eigs : List[float]    length == N
     """
     device = next(policy.parameters()).device
-    final_states  = []
-    final_rewards = []
-    final_max_eigs = []
+    obs_mean = obs_mean.to(device)
+    obs_var  = obs_var.to(device)
+
+    final_states, final_rewards, final_max_eigs = [], [], []
 
     for _ in tqdm(range(N), desc="Sampling parameters"):
-        # reset to a fresh random start
         state = env.reset().to(device)
         reward = 0.0
 
-        # step until done or max_steps
         for t in range(max_steps):
-            mean, std = policy(state)
+            # — apply frozen normalization, no updates —
+            norm_state = (state - obs_mean) / torch.sqrt(obs_var + 1e-6)
+
+            # get action distribution
+            mean, std = policy(norm_state)
             if deterministic:
                 action = mean
             else:
                 dist   = Normal(mean, std)
                 action = dist.rsample()
 
+            # step environment
             state, reward, done, all_eigenvalues = env.step(action, return_all_eigenvalues=True)
-            max_eig = np.max(all_eigenvalues)
             state = state.to(device)
+            max_eig = np.max(all_eigenvalues)
+
+            print(f"[{t}]: max_eig: {max_eig}, reward: {reward}")
             if done or reward > 0.5:
                 break
 
-        final_states .append(state.clone())
+        final_states.append(state.clone())
         final_rewards.append(reward)
         final_max_eigs.append(max_eig)
 
     return final_states, final_rewards, final_max_eigs
 
 
-def log_final_eval_metrics(policy_net, env, N: int = 100, max_steps: int = 50, wandb_summary=None):
+def log_final_eval_metrics(policy_net, env, obs_mean, obs_var, N: int = 100, max_steps: int = 50, wandb_summary=None):
     env.logging_enabled = False
-    _, _, final_max_eigs = sample_params(policy_net, env, N, max_steps)
+    _, _, final_max_eigs = sample_params(policy_net, env, obs_mean, obs_var, N, max_steps)
     env.logging_enabled = True
 
     is_valid_solution = [max_eig < env.eig_cutoff for max_eig in final_max_eigs]
