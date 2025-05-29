@@ -44,7 +44,7 @@ class PolicyNetwork(nn.Module):
         mean = self.mean_head(base_out)
         log_std = self.log_std_head(base_out)
         log_std = torch.clamp(log_std, min=self.min_log_std, max=self.max_log_std)
-        std = torch.exp(log_std)
+        std = torch.exp(log_std).clamp(min=1e-3, max=1e2)
         return mean, std
 
     def load_pretrained_policy_net(self, policy_net_path):
@@ -112,7 +112,7 @@ class PPOAgent:
         self.obs_count = tot_count
 
         # normalize
-        return (x - self.obs_mean) / torch.sqrt(self.obs_var + 1e-8)
+        return (x - self.obs_mean) / torch.sqrt(self.obs_var + 1e-6)
 
     def collect_trajectory(self, env: KineticEnv, episode: int):
         buf = TrajectoryBuffer()
@@ -124,9 +124,6 @@ class PPOAgent:
         for step in range(self.cfg.training.max_steps_per_episode):
 
             mean, std = self.policy_net(state)
-            mean = torch.nan_to_num(mean, nan=0.0, posinf=1e3, neginf=-1e3)
-            std  = torch.nan_to_num(std, nan=1e-3, posinf=1e3, neginf=1e-3)
-            std = std.clamp(min=1e-3, max=1e3)
             dist = torch.distributions.Normal(mean, std)
 
             action = dist.rsample()
@@ -258,13 +255,13 @@ class PPOAgent:
         dones = trajectory["dones"] # (T,)
 
         # normalize rewards
-        rewards = (rewards - rewards.mean()) / (rewards.std(unbiased=False) + 1e-8)
+        rewards = (rewards - rewards.mean()) / (rewards.std(unbiased=False) + 1e-6)
 
         # compute advantages & returns
         with torch.no_grad():
             last_value = self.value_net(states[-1]).item()
         advs, returns = self.compute_advantages(rewards, values, dones, last_value)
-        advs = (advs - advs.mean()) / (advs.std(unbiased=False) + 1e-8)
+        advs = (advs - advs.mean()) / (advs.std(unbiased=False) + 1e-6)
 
         # train policy and value network from the collected trajectory
         T = rewards.size(0)
@@ -283,24 +280,27 @@ class PPOAgent:
 
                 # normalize states
                 b_states = self.normalize_obs(b_states)
-                b_advs = (b_advs - b_advs.mean()) / (b_advs.std(unbiased=False) + 1e-8)
-                b_advs = torch.clamp(b_advs, -3.0, +3.0)
+                b_advs = (b_advs - b_advs.mean()) / (b_advs.std(unbiased=False) + 1e-6)
+                if self.global_step > 500:
+                    b_advs = torch.clamp(b_advs, -3.0, +3.0)
 
                 # policy forward
                 mean, std = self.policy_net(b_states)
-                mean = torch.nan_to_num(mean, nan=0.0, posinf=1e3, neginf=-1e3)
-                std  = torch.nan_to_num(std, nan=1e-3, posinf=1e3, neginf=1e-3)
-
                 dist = torch.distributions.Normal(mean, std)
                 new_logp = dist.log_prob(b_actions).sum(dim=-1)
 
                 # ratio for clipped surrogate
-                ratio = torch.exp(new_logp - b_oldlp)
+                delta = new_logp - b_oldlp
+                eps   = self.cfg.method.clip_eps
+                # ratio = torch.exp(new_logp - b_oldlp)
+                delta_clipped = torch.clamp(delta, -eps, +eps)
+                ratio         = torch.exp(delta_clipped)
                 clip_frac = ((ratio - 1.0).abs() > self.cfg.method.clip_eps).float().mean()
                 step_log_info["ppo/clip_fraction"] = clip_frac.item() # should be between 0.1 to 0.3
 
                 surr1 = ratio * b_advs
-                surr2 = torch.clamp(ratio, 1.0 - self.cfg.method.clip_eps, 1.0 + self.cfg.method.clip_eps) * b_advs
+                # surr2 = torch.clamp(ratio, 1.0 - self.cfg.method.clip_eps, 1.0 + self.cfg.method.clip_eps) * b_advs
+                surr2 = delta_clipped.exp().clamp(1-eps,1+eps) * b_advs
                 step_log_info["ppo/advs"] = b_advs.mean().item()
                 step_log_info["ppo/per_dim_ratio"] = torch.exp((new_logp - b_oldlp) / self.cfg.env.p_size).mean().item()
                 step_log_info["ppo/surr1"] = surr1.mean().item()
@@ -324,9 +324,6 @@ class PPOAgent:
                     + self.cfg.method.value_loss_weight * value_loss \
                     - self.cfg.method.entropy_loss_weight * entropy
                 step_log_info["ppo/loss"] = loss.item()
-
-                if torch.isnan(loss):
-                    continue
 
                 # optimize
                 optim_log_info = self._optimize_policy(loss, self.cfg.training.max_grad_norm)

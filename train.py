@@ -4,6 +4,10 @@ from functools import partial
 import hydra
 from omegaconf import DictConfig, OmegaConf
 
+import random
+import numpy as np
+import torch
+
 from helpers.jacobian_solver import check_jacobian
 
 from helpers.ppo_agent import PPOAgent
@@ -23,6 +27,10 @@ def train(cfg: DictConfig):
     print("-" * 50)
     print(OmegaConf.to_yaml(cfg))  # print config to verify
     print("-" * 50)
+
+    random.seed(cfg.seed)
+    np.random.seed(cfg.seed)
+    torch.manual_seed(cfg.seed)
 
     # Call solvers from SKimPy
     chk_jcbn = check_jacobian()
@@ -59,7 +67,8 @@ def train(cfg: DictConfig):
 
         # Final evaluation
         policy_net_dict, value_net_dict = ppo_agent.global_best_model
-        ppo_agent.policy_net.load_state_dict(policy_net_dict).eval()
+        ppo_agent.policy_net.load_state_dict(policy_net_dict)
+        ppo_agent.policy_net.eval()
         log_final_eval_metrics(ppo_agent.policy_net, env, N=100, max_steps=cfg.training.max_steps_per_episode, wandb_summary=run.summary)
 
         # Log models
