@@ -97,6 +97,8 @@ class PPOAgent:
         self.obs_var  = torch.ones(cfg.env.p_size, device=self.device)
         self.obs_count= 1e-4
 
+        self.current_episode = 0
+
     def normalize_obs(self, x):
         # update running stats
         batch_mean = x.mean(0)
@@ -119,6 +121,8 @@ class PPOAgent:
         best_setup = None
         best_reward = -math.inf
         best_step = None
+
+        self.current_episode = episode
 
         state = env.reset()
         for step in range(self.cfg.training.max_steps_per_episode):
@@ -248,6 +252,13 @@ class PPOAgent:
             trajectory: dict from buf.to_tensors()
         """
 
+        # clip eps annealing
+        eps0 = self.cfg.method.clip_eps_start
+        eps1 = self.cfg.method.clip_eps_end
+        T_eps = float(self.cfg.training.num_episodes)
+        frac_done = min(self.current_episode / T_eps, 1.0)
+        clip_eps = eps0 + frac_done * (eps1 - eps0)
+
         # unpack trajectory
         states = trajectory["states"] # (T, p_size)
         actions = trajectory["actions"] # (T, p_size)
@@ -271,6 +282,7 @@ class PPOAgent:
             idxs = torch.randperm(T) # shuffle indices
             for start in range(0, T, self.cfg.training.batch_size):
                 step_log_info = {"global_step": self.global_step}
+                step_log_info["ppo/clip_eps"] = clip_eps
 
                 # get batch of data
                 batch_idxs = idxs[start : start + self.cfg.training.batch_size]
@@ -297,12 +309,11 @@ class PPOAgent:
                 delta = new_logp - b_oldlp
                 step_log_info["ppo/raw_kl"] = delta.mean().item()
                 ratio = torch.exp(delta)
-                clip_frac = ((ratio - 1.0).abs() > self.cfg.method.clip_eps).float().mean()
+                clip_frac = ((ratio - 1.0).abs() > clip_eps).float().mean()
                 step_log_info["ppo/clip_fraction"] = clip_frac.item() # should be between 0.1 to 0.3
 
                 surr1 = ratio * b_advs
-                eps = self.cfg.method.clip_eps
-                surr2 = torch.clamp(ratio, 1.0 - eps, 1.0 + eps) * b_advs
+                surr2 = torch.clamp(ratio, 1.0 - clip_eps, 1.0 + clip_eps) * b_advs
                 step_log_info["ppo/advs"] = b_advs.mean().item()
                 step_log_info["ppo/per_dim_ratio"] = torch.exp((new_logp - b_oldlp) / self.cfg.env.p_size).mean().item()
                 step_log_info["ppo/surr1"] = surr1.mean().item()
