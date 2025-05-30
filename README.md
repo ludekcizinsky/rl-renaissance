@@ -88,6 +88,12 @@ If things go well, you should be able to execute the following command to check 
 python -c "import skimpy; import torch;print('Success')"
 ```
 
+## 📊 Inference
+
+We save all our final results in the `wandb` platform which is publicly [accessible](https://wandb.ai/ludekcizinsky/rl-renaissance/table?nw=4uf48ytfjog). You can take a look there to download any trained model using the available tags, please see how to do so in [this notebook](notebooks/download_trained_models.ipynb). However, if you just want to use the best model, we have saved all neccesary files in the `inference` directory under [best model folder](inference/best_model).
+
+Finally, to run it and play around with the generated kinetic models, and inspect the rewards, you can use the [inference notebook](notebooks/inference.ipynb).
+
 ## 🚀 Reproducing the results
 
 Assuming you are now inside the docker container and followed the instructions above, you can now run the code in the following way.
