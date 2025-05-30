@@ -1,10 +1,43 @@
-# rl-gen-of-kinetic-models
-Generation of kinetic models using RL.
+# RL-Renaissance
+
+TODO: please add method overview figure here.
+TODO: please add abstract here.
 
 
-## Setting up docker container
+## 🛠️ Setting up the environment
 
-### On node provided by Ilias 
+In order to run the code, you need to set up the **docker container** which is due to the dependency on [skimpy](https://github.com/EPFL-LCSB/skimpy) package. To make your life easier, and not having to build the container yourself, it is publicly [available](https://hub.docker.com/repository/docker/ludekcizinsky/renaissance_with_ml/general) on Docker Hub.
+
+### 👌 Izar or any other SLURM cluster that supports apptainer (if you have access, then recommended)
+
+First, pull the image from the Docker registry using apptainer (takes a couple of minutes):
+
+```bash
+mkdir -p /scratch/izar/$USER/images
+apptainer pull /scratch/izar/$USER/images/renaissance_with_ml.sif docker://ludekcizinsky/renaissance_with_ml:latest
+```
+
+Then, you can run the image with the following command:
+
+```bash
+mkdir -p /scratch/izar/$USER/rl-for-kinetics/output
+apptainer shell --nv --bind "$(pwd)":/home/renaissance/work --bind "/scratch/izar/$USER/rl-for-kinetics/output:/home/renaissance/output" /scratch/izar/$USER/images/renaissance_with_ml.sif
+```
+
+For some random reason, when inside the container, you also need to run:
+
+```bash
+export LC_ALL=C.UTF-8
+export LANG=C.UTF-8
+```
+
+If things go well, you should be able to execute the following command to check if the image is working:
+
+```bash
+python -c "import skimpy; import torch;print('Success')"
+```
+
+### 🌿 Laboratory of Computational Systems Biotechnology (LCSB)
 
 First, pull the image from the Docker registry (this should be already done, but just in case):
 
@@ -55,61 +88,21 @@ If things go well, you should be able to execute the following command to check 
 python -c "import skimpy; import torch;print('Success')"
 ```
 
-### Izar (if you have access, then recommended)
+## 🚀 Reproducing the results
 
-First, pull the image from the Docker registry using apptainer (takes a couple of minutes):
+Assuming you are now inside the docker container and followed the instructions above, you can now run the code in the following way.
 
-```bash
-mkdir -p /scratch/izar/$USER/images
-apptainer pull /scratch/izar/$USER/images/renaissance_with_ml.sif docker://ludekcizinsky/renaissance_with_ml:latest
-```
-
-Then, you can run the image with the following command:
-
-```bash
-mkdir -p /scratch/izar/$USER/rl-for-kinetics/output
-apptainer shell --nv --bind "$(pwd)":/home/renaissance/work --bind "/scratch/izar/$USER/rl-for-kinetics/output:/home/renaissance/output" /scratch/izar/$USER/images/renaissance_with_ml.sif
-```
-
-If things go well, you should be able to execute the following command to check if the image is working:
-
-```bash
-python -c "import skimpy; import torch;print('Success')"
-```
-
-Finally, note that you can use GPU to speed up the training. In the config, set `device: cuda`.
-
-## Running the code
-
-### Baseline code
-
-Once you have the Docker container running, you can run the original baseline code as follows:
-
-```bash
-cd renaissance
-python 1-renaissance.py
-```
-
-### RL code
-
-To run the training with default configuration (see `configs/train.yaml`), you can use the following command:
+In order to reproduce the results of the **main method** reported in the report, you can run the following command:
 
 ```bash
 python train.py
 ```
 
-In practice, however, you want to experiment with different configurations. You can override the default configuration by using the following command:
+In order to reproduce the results of the **ablation studies** reported in the report, you can schedule a SLURM job as follows:
 
 ```bash
-python train.py method.actor_lr=1e-4 method.latent_dim=256
+sbatch train1.slurm <your_username>
+sbatch train2.slurm <your_username>
 ```
 
-### Running with SLURM
-
-For those who have access to Izar, you can run the training with SLURM as follows. First, checkout the `train.slurm` file and adjust it as needed, usually you should change the name of the job, time requested and possibly also the account. Then, specify which configuration you want to use by changing the script at the bottom of the file (see the example usage in the file). Finally, you can submit the job with the following command (change to your izar usernmae):
-
-```bash
-sbatch train.slurm cizinsky
-```
-
-If things go wrong, you can check the output in the `outputs/slurm` directory.
+Or just look at the `train1.slurm` and `train2.slurm` files for which configurations you want to run on whatever system you are on.
