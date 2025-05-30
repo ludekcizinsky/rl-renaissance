@@ -4,6 +4,16 @@ TODO: please add method overview figure here.
 TODO: please add abstract here.
 
 
+## 🔮 Future work
+
+For those who are interested in the future of this project, here are some ideas:
+
+- Try using more predictions per step to obtain better estimate of the distribution of the next state, and stabilise the training
+- Run for more than 100 episodes, e.g. 150, 200
+- Try integrating timestep information into the model
+- Try using more complex model such as LSTM that can take into account temporal information
+- Try using non-stochastic policy, however stochastic input
+
 ## 🛠️ Setting up the environment
 
 In order to run the code, you need to set up the **docker container** which is due to the dependency on [skimpy](https://github.com/EPFL-LCSB/skimpy) package. To make your life easier, and not having to build the container yourself, it is publicly [available](https://hub.docker.com/repository/docker/ludekcizinsky/renaissance_with_ml/general) on Docker Hub.
