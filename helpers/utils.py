@@ -379,7 +379,8 @@ def sample_params(
     obs_var:  torch.Tensor,
     N: int = 10, 
     max_steps: int = 50,
-    deterministic: bool = False
+    deterministic: bool = False,
+    verbose: bool = False,
 ):
     """
     Run N roll-outs through the policy (stochastic or deterministic),
@@ -418,7 +419,9 @@ def sample_params(
             state = state.to(device)
             max_eig = np.max(all_eigenvalues)
 
-            print(f"[{t}]: max_eig: {max_eig}, reward: {reward}")
+            if verbose:
+                print(f"[{t}]: max_eig: {max_eig}, reward: {reward}")
+
             if done or reward > 0.5:
                 break
         
