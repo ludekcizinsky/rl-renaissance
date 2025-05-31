@@ -123,3 +123,7 @@ sbatch train2.slurm <your_username>
 ```
 
 Or just look at the `train1.slurm` and `train2.slurm` files for which configurations you want to run on whatever system you are on.
+
+## Acknowledgements
+
+We would like to thank [Ljubisa Miskovic](https://people.epfl.ch/cgi-bin/people?id=ljubisa.miskovic&lang=en&cvlang=en) and [Ilias Toumpe](https://people.epfl.ch/ilias.toumpe) for giving us useful guidance and feedback on the project.
