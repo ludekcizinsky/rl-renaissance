@@ -1,10 +1,11 @@
 # RL-Renaissance
 
-TODO: please add method overview figure here.
-TODO: please add abstract here.
+![RL-Renaissance](assets/method_overview.png)
+
+Kinetic models of cellular metabolism rely on accurate enzyme-specific parameters, but data scarcity and high-dimensional spaces hinder traditional methods. We present RL-Renaissance, an extension of the NES-based RENAISSANCE framework, that formulates kinetic parameterization as a sequential decision process. Using Proximal Policy Optimization (PPO), it iteratively refines a 384-dimensional parameter vector, guided by rewards based on the model's Jacobian eigenvalue. Compared to RENAISSANCE, RL-Renaissance achieves a 91% success rate (vs. 95%) on E. coli metabolism, while being almost 2x more sample efficient. Reward and eigenvalue analyses show effective learning, though PPO’s sensitivity to hyperparameters suggests avenues for refinement. These results demonstrate the potential of policy-gradient methods for efficient and scalable systems-biology modeling.
 
 
-## 🔮 Future work
+🔮 **Future work**
 
 For those who are interested in the future of this project, here are some ideas:
 
